@@ -25,9 +25,18 @@ class Config:
     poll_seconds: int = field(default_factory=lambda: _int("POLL_SECONDS", 5))
     frames_per_clip: int = field(default_factory=lambda: _int("FRAMES_PER_CLIP", 5))  # KORREKTUR M4-2
     min_confidence: float = field(default_factory=lambda: _float("MIN_CONFIDENCE", 0.40))
+    # Order matters: it is the label priority (first match wins on mixed scenes).
     detect_classes: list = field(
         default_factory=lambda: [
-            c.strip() for c in os.environ.get("DETECT_CLASSES", "person").split(",") if c.strip()
+            c.strip()
+            for c in os.environ.get("DETECT_CLASSES", "person,dog,cat").split(",")
+            if c.strip()
+        ]
+    )
+    # Which labels trigger a notification (M4c). Default: person only.
+    notify_labels: list = field(
+        default_factory=lambda: [
+            c.strip() for c in os.environ.get("NOTIFY_LABELS", "person").split(",") if c.strip()
         ]
     )
     # M4c — notifications
