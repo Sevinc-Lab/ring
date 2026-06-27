@@ -32,17 +32,32 @@ def setup_logging(level: str) -> None:
     )
 
 
-def classify(detector: Detector, frames: list[tuple[float, Image.Image]], min_conf: float):
-    """frames: [(timestamp, PIL.Image)] -> (label, max_conf, objects)."""
+def classify(
+    detector: Detector,
+    frames: list[tuple[float, Image.Image]],
+    min_conf: float,
+    priority: list[str],
+):
+    """frames: [(timestamp, PIL.Image)] -> (label, max_conf, objects).
+
+    label is the highest-priority class present (priority = DETECT_CLASSES order,
+    e.g. person > dog > cat), so a person with a dog is labeled 'person'.
+    """
     objects: list[dict] = []
-    max_conf = 0.0
+    by_class: dict[str, float] = {}
     for t, img in frames:
         for d in detector.detect(img):
             if d["conf"] >= min_conf:
                 objects.append({"t": round(t, 2), **d})
-                max_conf = max(max_conf, d["conf"])
+                by_class[d["name"]] = max(by_class.get(d["name"], 0.0), d["conf"])
     objects.sort(key=lambda o: o["conf"], reverse=True)
-    label = "person" if objects else "none"
+
+    label = "none"
+    for cls in priority:
+        if cls in by_class:
+            label = cls
+            break
+    max_conf = by_class.get(label, 0.0)
     return label, max_conf, objects[:10]
 
 
@@ -62,13 +77,15 @@ def process_event(cfg: Config, conn, detector: Detector, event: dict) -> None:
                     pass
             if not frames:
                 raise RuntimeError("no frames extracted")
-            label, max_conf, objects = classify(detector, frames, cfg.min_confidence)
+            label, max_conf, objects = classify(
+                detector, frames, cfg.min_confidence, cfg.detect_classes
+            )
         cpu_ms = round(1000 * (time.process_time() - t_cpu))
         wall_ms = round(1000 * (time.monotonic() - t_wall))
         meta = {
             "engine": ENGINE,
             "model": os.path.basename(cfg.model_path),
-            "detected": label == "person",
+            "detected": label != "none",
             "label": label,
             "max_conf": round(max_conf, 3),
             "frames_sampled": len(frames),
@@ -82,7 +99,7 @@ def process_event(cfg: Config, conn, detector: Detector, event: dict) -> None:
             "event %s -> %s (max_conf=%.2f, frames=%d, cpu=%dms, wall=%dms)",
             event["id"], label, max_conf, len(frames), cpu_ms, wall_ms,
         )
-        if label == "person":
+        if label in cfg.notify_labels:
             maybe_notify(cfg, build_payload(cfg, event, label, max_conf, objects))
     except Exception as e:  # noqa: BLE001
         cpu_ms = round(1000 * (time.process_time() - t_cpu))

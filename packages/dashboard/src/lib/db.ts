@@ -38,7 +38,7 @@ const SELECT_COLS = `id, device_id, device_name, kind, started_at, recording_sta
   clip_path, thumb_path, clip_seconds, cold_start_ms, label`
 
 /** Whitelisted label filters (M4b). 'all' = no filter. */
-export const LABEL_FILTERS = ['all', 'person', 'none', 'unclassified'] as const
+export const LABEL_FILTERS = ['all', 'person', 'dog', 'cat', 'none', 'unclassified'] as const
 export type LabelFilter = (typeof LABEL_FILTERS)[number]
 
 export function normalizeLabel(raw: string | undefined): LabelFilter {

@@ -15,6 +15,8 @@ const PAGE_SIZE = 60
 const FILTERS: { key: LabelFilter; text: string }[] = [
   { key: 'all', text: 'Alle' },
   { key: 'person', text: '🧍 Person' },
+  { key: 'dog', text: '🐕 Hund' },
+  { key: 'cat', text: '🐈 Katze' },
   { key: 'none', text: 'keine Person' },
   { key: 'unclassified', text: 'unklassifiziert' },
 ]

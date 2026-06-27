@@ -41,6 +41,10 @@ export function labelText(label: string): string {
       return '🧍 Person'
     case 'none':
       return 'keine Person'
+    case 'dog':
+      return '🐕 Hund'
+    case 'cat':
+      return '🐈 Katze'
     case 'unclassified':
       return 'unklassifiziert'
     case 'error':
@@ -58,6 +62,9 @@ export function labelClass(label: string): string {
     case 'person':
     case 'parcel':
       return 'person'
+    case 'dog':
+    case 'cat':
+      return 'animal'
     case 'error':
       return 'fail'
     case 'none':
