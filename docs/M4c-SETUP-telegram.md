@@ -109,13 +109,16 @@ docker compose logs -f ring-detector
 
 ## Teil E — Testen
 
-Schnelltest **ohne** vor die Kamera zu gehen — schick einen Test-Webhook von Hand:
+Schnelltest **ohne** vor die Kamera zu gehen — schick einen Test-Webhook von Hand.
+Die Felder werden **flach** geschickt (genau wie der echte Detector); n8n legt sie
+selbst unter `body` ab, deshalb greift die Vorlage `{{ $json.body.… }}`:
 ```bash
 curl -X POST http://192.168.1.50:5678/webhook/ring-person \
   -H 'Content-Type: application/json' \
-  -d '{"body":{"label":"person","device_name":"Garten","started_at":"test","max_conf":0.9,"event_url":"http://192.168.1.50:8080"}}'
+  -d '{"label":"person","device_name":"Garten","started_at":"test","max_conf":0.9,"event_url":"http://192.168.1.50:8080"}'
 ```
-→ Kommt eine **Telegram-Nachricht**? Dann steht die n8n-Seite. *(Hinweis: je nach n8n-Version musst du das `body`-Wrapping evtl. weglassen — dann ohne `"body":` testen.)*
+→ Kommt eine **Telegram-Nachricht** mit **gefüllten** Feldern? Dann steht die n8n-Seite.
+*(Falls die Felder leer bleiben: in der Vorlage `{{ $json.body.… }}` ↔ `{{ $json.… }}` tauschen — je nach n8n-Version.)*
 
 **Echter Test:** Geh vor die Kamera „Garten". Sobald der Worker aufgenommen und der
 Detector eine Person erkannt hat (ein paar Sekunden nach dem Clip), kommt die
