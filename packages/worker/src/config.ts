@@ -30,6 +30,9 @@ const EnvSchema = z.object({
   // Operation
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   DEVICE_FILTER: z.string().optional().default(''),
+  // Watchdog: cleanly restart every N hours so the (sometimes-stale) Ring push
+  // connection is refreshed. 0 = disabled. Far below any re-auth throttle.
+  WORKER_RESTART_HOURS: z.coerce.number().min(0).max(168).default(0),
 })
 
 export type Config = z.infer<typeof EnvSchema>

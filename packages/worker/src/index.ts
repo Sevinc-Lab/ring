@@ -121,6 +121,22 @@ async function main(): Promise<void> {
       'If NO "MOTION event received" lines appear, see Troubleshooting in docs/SETUP.md.',
   )
 
+  // Watchdog: the reverse-engineered Ring push connection can go stale over time
+  // (events silently stop arriving). A periodic clean restart re-establishes it.
+  // We exit(0); `restart: unless-stopped` brings the container back with a fresh
+  // connection. Once every N hours is far below any re-registration throttle.
+  if (config.WORKER_RESTART_HOURS > 0) {
+    const ms = config.WORKER_RESTART_HOURS * 60 * 60 * 1000
+    const watchdog = setTimeout(() => {
+      log.info(
+        { hours: config.WORKER_RESTART_HOURS },
+        'Watchdog: scheduled restart — exiting cleanly to refresh the Ring push connection',
+      )
+      shutdown(0)
+    }, ms)
+    watchdog.unref()
+  }
+
   // Heartbeat for the Docker HEALTHCHECK / CasaOS status.
   heartbeat = setInterval(() => {
     writeFile(config.HEARTBEAT_FILE, new Date().toISOString()).catch((err) =>
