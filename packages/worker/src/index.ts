@@ -94,6 +94,17 @@ async function main(): Promise<void> {
     shutdown(1)
   }
 
+  // Subscribe ONLY to the filtered `selected` set — never all `cameras`.
+  // Every motion subscription keeps a device active/awake; subscribing to a
+  // battery camera we don't care about would waste its battery for nothing.
+  const skipped = cameras.filter((c) => !selected.includes(c))
+  if (skipped.length) {
+    log.info(
+      { skipped: skipped.map((c) => ({ id: c.id, name: c.name })) },
+      'Cameras excluded by DEVICE_FILTER — NOT subscribed (battery-safe)',
+    )
+  }
+
   for (const cam of selected) {
     subscribeCamera(cam, repo, log)
   }
