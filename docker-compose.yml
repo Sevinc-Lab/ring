@@ -1,0 +1,17 @@
+# Local, event-driven NVR for a Ring battery camera — CasaOS / Docker.
+# M1: ring-worker only. M3 will add a read-only ring-dashboard service.
+#
+# Volumes live on the SATA disk under /DATA/ring (CasaOS convention). Adjust the
+# host paths on the left if your disk is mounted elsewhere — see docs/SETUP.md.
+
+services:
+  ring-worker:
+    build: ./packages/worker
+    image: sevinc-lab/ring-worker:0.1.0
+    container_name: ring-worker
+    env_file: .env
+    volumes:
+      - /DATA/ring/media:/data/media     # rw: mp4 + thumbnails (M2)
+      - /DATA/ring/db:/data/db           # rw: sqlite + heartbeat
+      - /DATA/ring/secrets:/data/secrets # rw: rotated refresh token (0600)
+    restart: unless-stopped
