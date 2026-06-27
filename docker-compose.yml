@@ -34,3 +34,24 @@ services:
     ports:
       - "8080:8080"
     restart: unless-stopped
+
+  # M4a: post-hoc person detection. Polls recorded+unclassified clips, samples
+  # frames across the whole clip, runs YOLOv8n (CPU), writes ONLY label/label_meta.
+  # Fully decoupled — if this is down, the worker keeps recording. Never deletes.
+  ring-detector:
+    build: ./packages/detector
+    image: sevinc-lab/ring-detector:0.1.0
+    container_name: ring-detector
+    environment:
+      - DATA_DB_PATH=/data/db/ring.db
+      - DATA_MEDIA_DIR=/data/media
+      - POLL_SECONDS=5
+      - FRAMES_PER_CLIP=5
+      - MIN_CONFIDENCE=0.40
+      - DETECT_CLASSES=person      # 'parcel' needs a custom model (M4d)
+      - NOTIFY_ENABLED=false       # real n8n notify is M4c
+      - TZ=Europe/Berlin
+    volumes:
+      - /DATA/ring/media:/data/media:ro  # ro: read clips
+      - /DATA/ring/db:/data/db           # rw: writes ONLY label/label_meta
+    restart: unless-stopped
