@@ -33,3 +33,36 @@ export function statusClass(status: string): string {
       return 'muted' // event_only and anything else
   }
 }
+
+/** Human label text (M4b). */
+export function labelText(label: string): string {
+  switch (label) {
+    case 'person':
+      return '🧍 Person'
+    case 'none':
+      return 'keine Person'
+    case 'unclassified':
+      return 'unklassifiziert'
+    case 'error':
+      return 'Fehler'
+    case 'parcel':
+      return '📦 Paket'
+    default:
+      return label
+  }
+}
+
+/** Visual class suffix for a label badge. */
+export function labelClass(label: string): string {
+  switch (label) {
+    case 'person':
+    case 'parcel':
+      return 'person'
+    case 'error':
+      return 'fail'
+    case 'none':
+      return 'muted'
+    default:
+      return 'pending' // unclassified (not yet processed)
+  }
+}

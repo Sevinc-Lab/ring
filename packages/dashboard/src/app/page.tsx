@@ -1,26 +1,46 @@
 import Link from 'next/link'
-import { listEvents, countEvents, type EventRow } from '@/lib/db'
-import { fmtTime, statusClass } from '@/lib/format'
+import {
+  listEvents,
+  countEvents,
+  normalizeLabel,
+  type EventRow,
+  type LabelFilter,
+} from '@/lib/db'
+import { fmtTime, statusClass, labelText, labelClass } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 60
 
-function loadPage(page: number): { events: EventRow[]; total: number; ok: boolean } {
+const FILTERS: { key: LabelFilter; text: string }[] = [
+  { key: 'all', text: 'Alle' },
+  { key: 'person', text: '🧍 Person' },
+  { key: 'none', text: 'keine Person' },
+  { key: 'unclassified', text: 'unklassifiziert' },
+]
+
+function load(page: number, label: LabelFilter) {
   try {
-    const total = countEvents()
-    const events = listEvents(PAGE_SIZE, (page - 1) * PAGE_SIZE)
-    return { events, total, ok: true }
+    const total = countEvents(label)
+    const counts: Record<string, number> = {}
+    for (const f of FILTERS) counts[f.key] = f.key === label ? total : countEvents(f.key)
+    const events = listEvents(PAGE_SIZE, (page - 1) * PAGE_SIZE, label)
+    return { events, total, counts, ok: true }
   } catch {
-    // DB not present yet (worker hasn't recorded anything / volume not mounted)
-    return { events: [], total: 0, ok: false }
+    return { events: [] as EventRow[], total: 0, counts: {} as Record<string, number>, ok: false }
   }
 }
 
-export default function Home({ searchParams }: { searchParams: { page?: string } }) {
+export default function Home({
+  searchParams,
+}: {
+  searchParams: { page?: string; label?: string }
+}) {
+  const label = normalizeLabel(searchParams.label)
   const page = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
-  const { events, total, ok } = loadPage(page)
+  const { events, total, counts, ok } = load(page, label)
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const qs = (p: number) => `/?label=${label}&page=${p}`
 
   return (
     <div className="wrap">
@@ -31,10 +51,25 @@ export default function Home({ searchParams }: { searchParams: { page?: string }
         </span>
       </div>
 
+      {ok ? (
+        <nav className="filters">
+          {FILTERS.map((f) => (
+            <Link
+              key={f.key}
+              href={`/?label=${f.key}`}
+              className={`chip${f.key === label ? ' active' : ''}`}
+            >
+              {f.text}
+              {counts[f.key] != null ? <span className="n">{counts[f.key]}</span> : null}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+
       {events.length === 0 ? (
         <p className="empty">
           {ok
-            ? 'Noch keine Events. Sobald die Kamera Bewegung meldet, erscheinen hier Clips.'
+            ? 'Keine Events für diesen Filter.'
             : 'Warte auf den Worker / die SQLite-Datenbank unter DATA_DB_PATH.'}
         </p>
       ) : (
@@ -52,11 +87,12 @@ export default function Home({ searchParams }: { searchParams: { page?: string }
               </div>
               <div className="meta">
                 <span className="time">{fmtTime(e.started_at)}</span>
-                <span className="sub">
-                  {(e.device_name ?? 'Kamera') + ' · ' + e.kind}
-                </span>
-                <span className={`badge ${statusClass(e.recording_status)}`}>
-                  {e.recording_status}
+                <span className="sub">{(e.device_name ?? 'Kamera') + ' · ' + e.kind}</span>
+                <span className="badges">
+                  <span className={`badge ${labelClass(e.label)}`}>{labelText(e.label)}</span>
+                  <span className={`badge ${statusClass(e.recording_status)}`}>
+                    {e.recording_status}
+                  </span>
                 </span>
               </div>
             </Link>
@@ -66,19 +102,11 @@ export default function Home({ searchParams }: { searchParams: { page?: string }
 
       {pages > 1 ? (
         <nav className="pager">
-          {page > 1 ? (
-            <Link href={`/?page=${page - 1}`}>← Neuer</Link>
-          ) : (
-            <span className="disabled">← Neuer</span>
-          )}
+          {page > 1 ? <Link href={qs(page - 1)}>← Neuer</Link> : <span className="disabled">← Neuer</span>}
           <span>
             Seite {page} / {pages}
           </span>
-          {page < pages ? (
-            <Link href={`/?page=${page + 1}`}>Älter →</Link>
-          ) : (
-            <span className="disabled">Älter →</span>
-          )}
+          {page < pages ? <Link href={qs(page + 1)}>Älter →</Link> : <span className="disabled">Älter →</span>}
         </nav>
       ) : null}
     </div>

@@ -51,10 +51,54 @@ a {
   font-size: 13px;
 }
 
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid #262b35;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.chip:hover {
+  border-color: var(--accent);
+}
+.chip.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: #1b2030;
+}
+.chip .n {
+  font-size: 11px;
+  color: var(--muted);
+  background: #0d1017;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
+}
+
+.meta .badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.badge.person {
+  color: var(--accent);
+  border-color: #2f3d6b;
 }
 
 .card {
