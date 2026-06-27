@@ -13,17 +13,25 @@ import urllib.request
 log = logging.getLogger("detector.notify")
 
 
-def build_payload(event: dict, label: str, max_conf: float, objects: list[dict]) -> dict:
-    return {
+def build_payload(cfg, event: dict, label: str, max_conf: float, objects: list[dict]) -> dict:
+    base = getattr(cfg, "dashboard_base_url", "") or ""
+    clip_path = event.get("clip_path")
+    thumb_path = event.get("thumb_path")
+    payload = {
         "label": label,
         "device_id": event.get("device_id"),
         "device_name": event.get("device_name"),
         "started_at": event.get("started_at"),
-        "clip_path": event.get("clip_path"),
-        "thumb_path": event.get("thumb_path"),
+        "clip_path": clip_path,
+        "thumb_path": thumb_path,
         "max_conf": round(max_conf, 3),
         "objects": objects,
+        # Clickable links for the n8n/Telegram message (empty if base not set).
+        "event_url": f"{base}/event/{event.get('id')}" if base else None,
+        "clip_url": f"{base}/api/media/{clip_path}" if base and clip_path else None,
+        "thumb_url": f"{base}/api/media/{thumb_path}" if base and thumb_path else None,
     }
+    return payload
 
 
 def maybe_notify(cfg, payload: dict) -> None:
