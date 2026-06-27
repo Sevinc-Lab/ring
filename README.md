@@ -11,10 +11,12 @@ unofficial [`dgreif/ring`](https://github.com/dgreif/ring) `ring-client-api`.
 > A (free) Ring account + Ring's cloud remain **required** — the hardware has no
 > local API. Only the application/storage layer is local.
 
-## Status: M1
+## Status: M2
 Worker container that authenticates, **persists the rotating refresh token**
-across restarts, and receives **motion events** into a local SQLite index.
-No video recording yet — that's M2.
+across restarts, receives **motion events**, and on each event **records a short
+clip** (`recordToFile`) to the SATA disk with a **first-frame thumbnail** and an
+indexed SQLite row (incl. measured cold-start latency). M1 is verified on real
+hardware; M2 awaits its on-device verify (clip + thumbnail + battery impact).
 
 ➡️ **Setup:** [`docs/SETUP.md`](docs/SETUP.md) (beginner-friendly, copy-paste)
 ➡️ **Design & decisions:** [`docs/PLAN.md`](docs/PLAN.md)
@@ -30,8 +32,8 @@ docker compose logs -f ring-worker
 ```
 
 ## Milestones
-- **M1** — worker, token persistence, motion-event reception ← *current*
-- **M2** — event → mp4 clip + first-frame thumbnail + metadata
+- **M1** — worker, token persistence, motion-event reception ✅ (verified on hardware)
+- **M2** — event → mp4 clip + first-frame thumbnail + metadata ← *current*
 - **M3** — local Next.js dashboard (timeline + playback)
 - **M4** *(deferred)* — detection + notifications
 
