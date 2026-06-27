@@ -40,7 +40,7 @@ docker compose logs -f ring-worker
 - **M1** — worker, token persistence, motion-event reception ✅ (verified on hardware)
 - **M2** — event → mp4 clip + first-frame thumbnail + metadata ✅ (verified on hardware)
 - **M3** — local Next.js dashboard (timeline + playback) ← *current*
-- **M4** *(deferred)* — detection + notifications
+- **M4** — detection + notifications *(in progress: **M4a** person-detection ← current; M4b dashboard labels; M4c n8n notify; M4d parcel)*
 
 ## Dashboard
 After `docker compose up -d --build`, open `http://<zimablade-ip>:8080` on the LAN.
@@ -54,6 +54,7 @@ docker-compose.yml    ring-worker + ring-dashboard services
 .env.example          configuration template
 packages/worker/      TypeScript worker (Node 20 + ffmpeg)
 packages/dashboard/   Next.js dashboard (timeline + playback)
+packages/detector/    Python person-detector (YOLOv8n CPU; writes label only)
 ```
 
 ## License

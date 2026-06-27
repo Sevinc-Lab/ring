@@ -1,0 +1,4 @@
+# Lean CPU inference — no torch at runtime.
+onnxruntime>=1.20,<2
+numpy>=1.26,<3
+pillow>=10,<12
