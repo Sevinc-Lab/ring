@@ -4,7 +4,15 @@
 # slower (downloads the CPU export toolchain once).
 FROM python:3.11-slim AS model
 WORKDIR /m
-RUN pip install --no-cache-dir ultralytics --extra-index-url https://download.pytorch.org/whl/cpu
+# ultralytics pulls full opencv-python, which needs X11/Qt/GL system libs absent
+# from the slim image. Swap to opencv-python-headless so the one-off export runs
+# without them (+ libglib2.0-0 which headless still links).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libglib2.0-0 \
+  && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir ultralytics --extra-index-url https://download.pytorch.org/whl/cpu \
+  && pip uninstall -y opencv-python \
+  && pip install --no-cache-dir opencv-python-headless
 RUN yolo export model=yolov8n.pt format=onnx imgsz=640 && test -f yolov8n.onnx
 
 # ---- runtime stage (lean: onnxruntime + ffmpeg + the .onnx) ----
