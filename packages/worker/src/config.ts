@@ -45,9 +45,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return parsed.data
 }
 
-/** Parse DEVICE_FILTER ("" = no filter) into a list of id/name needles. */
+/**
+ * Parse DEVICE_FILTER ("" = no filter) into a list of id/name needles.
+ *
+ * Defensive: strip an inline `# comment` first. docker compose's `env_file`
+ * does not reliably strip trailing inline comments, so a value like
+ * `DEVICE_FILTER=   # ...` would otherwise arrive as the comment text and match
+ * no cameras. Treating everything from the first `#` as a comment keeps a
+ * mis-formatted .env from turning into a fatal "matched no cameras" loop.
+ */
 export function parseDeviceFilter(raw: string): string[] {
-  return raw
+  const withoutComment = raw.split('#')[0]
+  return withoutComment
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
