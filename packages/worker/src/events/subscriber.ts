@@ -37,13 +37,20 @@ export function subscribeCamera(camera: RingCamera, repo: Repository, log: Logge
     }
   })
 
-  // Best-effort richer metadata for debugging only (shape varies across versions).
+  // Best-effort richer metadata for debugging only.
+  //
+  // NOTE: `onNewNotification` is accessed through an `any`-style cast on purpose.
+  // Its payload shape is NOT stable — it varies across ring-client-api versions
+  // (and was renamed from `onNewDing` historically). We therefore do not rely on
+  // any field here: the value is only logged at debug level, never parsed or used
+  // to drive behaviour. If a future milestone needs fields off this payload,
+  // validate them at runtime (e.g. with zod) rather than trusting the type.
   const anyCam = camera as unknown as {
     onNewNotification?: { subscribe: (cb: (n: unknown) => void) => void }
   }
-  if (anyCam.onNewNotification?.subscribe) {
+  if (typeof anyCam.onNewNotification?.subscribe === 'function') {
     anyCam.onNewNotification.subscribe((n) => {
-      log.debug({ deviceId, notification: n }, 'raw push notification')
+      log.debug({ deviceId, notification: n }, 'raw push notification (shape is version-dependent)')
     })
   }
 
