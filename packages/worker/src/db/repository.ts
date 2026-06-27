@@ -41,6 +41,15 @@ export interface NewEvent {
   recordingStatus: RecordingStatus
 }
 
+export interface RecordingUpdate {
+  recordingStatus: RecordingStatus
+  clipPath?: string | null
+  thumbPath?: string | null
+  clipSeconds?: number | null
+  coldStartMs?: number | null
+  error?: string | null
+}
+
 export class Repository {
   private readonly db: Database.Database
 
@@ -81,6 +90,30 @@ export class Repository {
       }
       throw err
     }
+  }
+
+  /** Update the recording outcome of an event row (M2). Never deletes rows. */
+  updateRecording(id: number, u: RecordingUpdate): void {
+    this.db
+      .prepare(
+        `UPDATE events SET
+           recording_status = @recordingStatus,
+           clip_path        = @clipPath,
+           thumb_path       = @thumbPath,
+           clip_seconds     = @clipSeconds,
+           cold_start_ms    = @coldStartMs,
+           error            = @error
+         WHERE id = @id`,
+      )
+      .run({
+        id,
+        recordingStatus: u.recordingStatus,
+        clipPath: u.clipPath ?? null,
+        thumbPath: u.thumbPath ?? null,
+        clipSeconds: u.clipSeconds ?? null,
+        coldStartMs: u.coldStartMs ?? null,
+        error: u.error ?? null,
+      })
   }
 
   close(): void {

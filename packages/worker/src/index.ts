@@ -105,14 +105,20 @@ async function main(): Promise<void> {
     )
   }
 
+  const motionCtx = {
+    repo,
+    mediaRoot: config.DATA_MEDIA_DIR,
+    clipSeconds: config.CLIP_SECONDS,
+    log,
+  }
   for (const cam of selected) {
-    subscribeCamera(cam, repo, log)
+    subscribeCamera(cam, motionCtx)
   }
 
   log.info(
-    { count: selected.length },
-    '✅ Listening for motion events. Walk in front of the camera to test. ' +
-      'If NO "MOTION event received" lines appear, see M1-Gate #2 / Troubleshooting in docs/SETUP.md.',
+    { count: selected.length, clipSeconds: config.CLIP_SECONDS },
+    '✅ Listening for motion events. On motion: record a clip + first-frame thumbnail to SATA. ' +
+      'If NO "MOTION event received" lines appear, see Troubleshooting in docs/SETUP.md.',
   )
 
   // Heartbeat for the Docker HEALTHCHECK / CasaOS status.
