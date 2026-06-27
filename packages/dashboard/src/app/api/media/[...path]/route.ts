@@ -1,10 +1,70 @@
 import type { NextRequest } from 'next/server'
 import { createReadStream, statSync } from 'fs'
-import { Readable } from 'stream'
+import type { ReadStream } from 'fs'
 import { resolveMediaPath, mimeFor } from '@/lib/media'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+/**
+ * Wrap a Node read stream as a web ReadableStream with correct lifecycle:
+ * - client disconnect / seek (cancel) destroys the file stream
+ * - backpressure via pause/resume so we don't buffer the whole file
+ * - enqueue-after-close is guarded (the browser aborting a Range request mid-
+ *   flight must not throw "Controller is already closed")
+ *
+ * <video> elements and lazy-loaded thumbnails abort requests constantly, so
+ * this must be robust.
+ */
+function toWebStream(nodeStream: ReadStream): ReadableStream<Uint8Array> {
+  let done = false
+  const finish = () => {
+    if (done) return
+    done = true
+    nodeStream.destroy()
+  }
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      nodeStream.on('data', (chunk: string | Buffer) => {
+        if (done) return
+        const buf = typeof chunk === 'string' ? Buffer.from(chunk) : chunk
+        try {
+          controller.enqueue(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength))
+        } catch {
+          finish() // controller already closed (client went away)
+          return
+        }
+        if (controller.desiredSize !== null && controller.desiredSize <= 0) {
+          nodeStream.pause()
+        }
+      })
+      nodeStream.on('end', () => {
+        if (done) return
+        done = true
+        try {
+          controller.close()
+        } catch {
+          /* already closed */
+        }
+      })
+      nodeStream.on('error', (err) => {
+        if (done) return
+        done = true
+        try {
+          controller.error(err)
+        } catch {
+          /* already closed */
+        }
+      })
+    },
+    pull() {
+      nodeStream.resume()
+    },
+    cancel() {
+      finish()
+    },
+  })
+}
 
 /**
  * Serve a media file (mp4 clip or jpg thumbnail) from MEDIA_ROOT.
@@ -43,10 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
           headers: { 'Content-Range': `bytes */${size}` },
         })
       }
-      const body = Readable.toWeb(
-        createReadStream(abs, { start, end }),
-      ) as unknown as ReadableStream
-      return new Response(body, {
+      return new Response(toWebStream(createReadStream(abs, { start, end })), {
         status: 206,
         headers: {
           ...baseHeaders,
@@ -57,8 +114,7 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
     }
   }
 
-  const body = Readable.toWeb(createReadStream(abs)) as unknown as ReadableStream
-  return new Response(body, {
+  return new Response(toWebStream(createReadStream(abs)), {
     status: 200,
     headers: { ...baseHeaders, 'Content-Length': String(size) },
   })
