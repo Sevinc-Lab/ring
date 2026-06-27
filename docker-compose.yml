@@ -15,3 +15,22 @@ services:
       - /DATA/ring/db:/data/db           # rw: sqlite + heartbeat
       - /DATA/ring/secrets:/data/secrets # rw: rotated refresh token (0600)
     restart: unless-stopped
+
+  # M3: local LAN dashboard — event timeline + clip playback. Reads the index
+  # with a read-only DB *connection*; the db volume is mounted read-write so
+  # SQLite's WAL shared-memory works across both containers (the connection
+  # still cannot write a row). Media is mounted read-only.
+  ring-dashboard:
+    build: ./packages/dashboard
+    image: sevinc-lab/ring-dashboard:0.1.0
+    container_name: ring-dashboard
+    environment:
+      - DATA_DB_PATH=/data/db/ring.db
+      - DATA_MEDIA_DIR=/data/media
+      - TZ=Europe/Berlin
+    volumes:
+      - /DATA/ring/media:/data/media:ro  # ro: serve clips + thumbnails
+      - /DATA/ring/db:/data/db           # rw mount, read-only connection (WAL shm)
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
