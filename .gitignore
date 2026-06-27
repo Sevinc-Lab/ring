@@ -1,0 +1,21 @@
+# Secrets / local config
+.env
+*.env.local
+
+# Node
+node_modules/
+dist/
+*.log
+npm-debug.log*
+
+# Local media/db (never commit recordings or the index)
+/DATA/
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
