@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getEvent } from '@/lib/db'
-import { fmtTime, fmtColdStart, statusClass } from '@/lib/format'
+import { fmtTime, fmtColdStart, statusClass, labelText, labelClass } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,7 +53,9 @@ export default function EventPage({ params }: { params: { id: string } }) {
           <span className={`badge ${statusClass(ev.recording_status)}`}>{ev.recording_status}</span>
         </dd>
         <dt>Label</dt>
-        <dd>{ev.label}</dd>
+        <dd>
+          <span className={`badge ${labelClass(ev.label)}`}>{labelText(ev.label)}</span>
+        </dd>
         <dt>Clip-Länge</dt>
         <dd>{ev.clip_seconds != null ? `${ev.clip_seconds} s` : '–'}</dd>
         <dt>Cold-Start</dt>

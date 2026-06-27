@@ -37,12 +37,27 @@ function db(): Database.Database {
 const SELECT_COLS = `id, device_id, device_name, kind, started_at, recording_status,
   clip_path, thumb_path, clip_seconds, cold_start_ms, label`
 
-export function listEvents(limit: number, offset: number): EventRow[] {
+/** Whitelisted label filters (M4b). 'all' = no filter. */
+export const LABEL_FILTERS = ['all', 'person', 'none', 'unclassified'] as const
+export type LabelFilter = (typeof LABEL_FILTERS)[number]
+
+export function normalizeLabel(raw: string | undefined): LabelFilter {
+  return (LABEL_FILTERS as readonly string[]).includes(raw ?? '')
+    ? (raw as LabelFilter)
+    : 'all'
+}
+
+function labelWhere(label: LabelFilter): { sql: string; params: string[] } {
+  return label === 'all' ? { sql: '', params: [] } : { sql: 'WHERE label = ?', params: [label] }
+}
+
+export function listEvents(limit: number, offset: number, label: LabelFilter = 'all'): EventRow[] {
+  const w = labelWhere(label)
   return db()
     .prepare(
-      `SELECT ${SELECT_COLS} FROM events ORDER BY started_at DESC, id DESC LIMIT ? OFFSET ?`,
+      `SELECT ${SELECT_COLS} FROM events ${w.sql} ORDER BY started_at DESC, id DESC LIMIT ? OFFSET ?`,
     )
-    .all(limit, offset) as EventRow[]
+    .all(...w.params, limit, offset) as EventRow[]
 }
 
 export function getEvent(id: number): EventRow | undefined {
@@ -51,7 +66,10 @@ export function getEvent(id: number): EventRow | undefined {
     .get(id) as EventRow | undefined
 }
 
-export function countEvents(): number {
-  const row = db().prepare(`SELECT COUNT(*) AS n FROM events`).get() as { n: number }
+export function countEvents(label: LabelFilter = 'all'): number {
+  const w = labelWhere(label)
+  const row = db().prepare(`SELECT COUNT(*) AS n FROM events ${w.sql}`).get(...w.params) as {
+    n: number
+  }
   return row.n
 }
