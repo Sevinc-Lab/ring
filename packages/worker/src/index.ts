@@ -20,7 +20,7 @@ async function main(): Promise<void> {
       mediaDir: config.DATA_MEDIA_DIR,
       db: config.DATA_DB_PATH,
     },
-    'Starting Ring NVR worker (M1: event reception)',
+    'Starting Ring NVR worker (M2: event-driven recording)',
   )
 
   const tokenStore = new TokenStore(config.TOKEN_FILE, log)
