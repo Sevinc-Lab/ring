@@ -11,12 +11,17 @@ unofficial [`dgreif/ring`](https://github.com/dgreif/ring) `ring-client-api`.
 > A (free) Ring account + Ring's cloud remain **required** — the hardware has no
 > local API. Only the application/storage layer is local.
 
-## Status: M2
-Worker container that authenticates, **persists the rotating refresh token**
-across restarts, receives **motion events**, and on each event **records a short
-clip** (`recordToFile`) to the SATA disk with a **first-frame thumbnail** and an
-indexed SQLite row (incl. measured cold-start latency). M1 is verified on real
-hardware; M2 awaits its on-device verify (clip + thumbnail + battery impact).
+## Status: M3
+Two containers:
+- **ring-worker** — authenticates, **persists the rotating refresh token** across
+  restarts, receives **motion events**, and on each event **records a short clip**
+  (`recordToFile`) to the SATA disk with a **first-frame thumbnail** and an indexed
+  SQLite row (incl. measured cold-start latency).
+- **ring-dashboard** — a local **Next.js** app on the LAN (`:8080`) that reads the
+  SQLite index **read-only** and shows an **event timeline with thumbnails** and
+  **in-browser clip playback** (HTTP Range / seeking).
+
+M1 + M2 are verified on real hardware; M3 awaits its on-device verify.
 
 ➡️ **Setup:** [`docs/SETUP.md`](docs/SETUP.md) (beginner-friendly, copy-paste)
 ➡️ **Design & decisions:** [`docs/PLAN.md`](docs/PLAN.md)
@@ -33,16 +38,22 @@ docker compose logs -f ring-worker
 
 ## Milestones
 - **M1** — worker, token persistence, motion-event reception ✅ (verified on hardware)
-- **M2** — event → mp4 clip + first-frame thumbnail + metadata ← *current*
-- **M3** — local Next.js dashboard (timeline + playback)
+- **M2** — event → mp4 clip + first-frame thumbnail + metadata ✅ (verified on hardware)
+- **M3** — local Next.js dashboard (timeline + playback) ← *current*
 - **M4** *(deferred)* — detection + notifications
+
+## Dashboard
+After `docker compose up -d --build`, open `http://<zimablade-ip>:8080` on the LAN.
+It reads the worker's SQLite index read-only — no extra config. (Remote access is
+out of scope; add Tailscale later if wanted.)
 
 ## Repository layout
 ```
 docs/                 PLAN.md, SETUP.md, ARCHITECTURE.md
-docker-compose.yml    ring-worker service (M1)
+docker-compose.yml    ring-worker + ring-dashboard services
 .env.example          configuration template
 packages/worker/      TypeScript worker (Node 20 + ffmpeg)
+packages/dashboard/   Next.js dashboard (timeline + playback)
 ```
 
 ## License
