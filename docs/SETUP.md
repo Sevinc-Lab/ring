@@ -247,6 +247,56 @@ Bekannte Eigenheiten der inoffiziellen API — der Reihe nach probieren:
    - `docker compose up -d --build`, dann Test 3b wiederholen.
 4. Erst wenn 1–3 nichts bringen, greift das **No-Go (Gate #2)** oben.
 
+### „`Listening` erscheint, aber keine Events" → `PHONE_REGISTRATION_ERROR`
+**Symptom:** Der Worker zeigt `Subscribed to motion events` + `✅ Listening`,
+aber bei Bewegung kommt **kein** `🔔 MOTION event received`. Im Log steht:
+```
+Register request has failed with Error=PHONE_REGISTRATION_ERROR
+Retry... 1
+```
+Das ist die **Push-Registrierung** (Firebase/FCM) — der Kanal, über den Events
+geliefert werden. Schlägt sie fehl, kommen keine Events, **egal ob die Kamera
+welche feuert**.
+
+**Zuerst die Ursache eingrenzen (kostenlos):** Zeigt die **Ring-Handy-App
+selbst** Bewegung für die Kamera an (Verlauf/Push)?
+- **App zeigt Motion, Worker nicht** → reines Push-Registrierungsproblem (unten
+  fixbar). Die Kamera ist in Ordnung — **kein** Gate-#2-No-Go.
+- **App zeigt auch keine Motion** → Empfindlichkeit/Zonen am Gerät (Punkt 2 oben)
+  oder doch das No-Go.
+
+**Häufigste Auslöser:** (a) zu viele Registrierungs-Versuche in kurzer Zeit —
+z.B. eine Absturz-/Neustart-Schleife —, Ring drosselt dann kurzzeitig; (b) eine
+parallel laufende Ring-Handy-App; (c) eine zu alte `ring-client-api`.
+
+**So setzt du es sauber zurück — in dieser Reihenfolge, ohne zwischendurch neu
+zu starten:**
+1. **Aktueller Build.** Stelle sicher, dass `ring-client-api` **≥ 14.3.0** ist
+   (ältere Versionen haben den Push-Bug). Falls dein Checkout älter ist:
+   `git pull` und unten mit `--build` neu bauen.
+2. **Worker stoppen und gestoppt lassen:** `docker compose stop`
+3. **Ring-App am Handy komplett schließen** (aus dem App-Switcher wischen) und für
+   den ganzen Test geschlossen lassen.
+4. **Client im Control Center entfernen:** Ring-App → *Control Center →
+   Autorisierte Client-Geräte* → Eintrag `local-nvr` (und etwaige Duplikate)
+   **löschen**.
+5. **30–60 Min warten** — wirklich. Das lässt die Registrierungs-Drossel ablaufen.
+   **Nicht** zwischendurch starten (jeder Start = neuer Registrierungs-Versuch =
+   Drossel bleibt).
+6. **Frischen Token** erzeugen (Schritt 1 dieser Anleitung) → in die `.env`.
+7. **Einmalig** bauen & starten, dann **in Ruhe lassen:**
+   ```bash
+   docker compose up -d --build
+   docker compose logs -f --since 2m ring-worker
+   ```
+   `Strg`+`C` auf den Logs ist ok; `stop`/`restart` jetzt **nicht**.
+8. **Prüfen:** Ist `PHONE_REGISTRATION_ERROR` **weg**? Dann vor die Kamera gehen →
+   `🔔 MOTION event received` sollte erscheinen.
+
+> **Merksatz:** Vermeide Neustart-Schleifen. Jeder Container-Neustart ist ein
+> frischer Push-Registrierungs-Versuch — schnelle Schleifen lösen genau diese
+> Drossel aus. Lass den Worker nach einem sauberen Start einfach laufen.
+
 ### „No cameras found"
 - Stimmt das Ring-Konto (richtige E-Mail in Schritt 1)?
 - Hängt die Kamera am selben Konto? In der Ring-App prüfen.
