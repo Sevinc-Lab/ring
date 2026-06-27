@@ -30,9 +30,14 @@ class Config:
             c.strip() for c in os.environ.get("DETECT_CLASSES", "person").split(",") if c.strip()
         ]
     )
-    # M4c — unused in M4a (stub stays off by default)
+    # M4c — notifications
     n8n_webhook_url: str = field(default_factory=lambda: os.environ.get("N8N_WEBHOOK_URL", ""))
     notify_enabled: bool = field(
         default_factory=lambda: os.environ.get("NOTIFY_ENABLED", "false").lower() == "true"
+    )
+    # Base URL of the dashboard, e.g. http://192.168.1.50:8080 — used to build
+    # clickable event/thumbnail links in the notification payload. Optional.
+    dashboard_base_url: str = field(
+        default_factory=lambda: os.environ.get("DASHBOARD_BASE_URL", "").rstrip("/")
     )
     log_level: str = field(default_factory=lambda: os.environ.get("LOG_LEVEL", "info"))

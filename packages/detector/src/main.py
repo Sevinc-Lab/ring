@@ -83,7 +83,7 @@ def process_event(cfg: Config, conn, detector: Detector, event: dict) -> None:
             event["id"], label, max_conf, len(frames), cpu_ms, wall_ms,
         )
         if label == "person":
-            maybe_notify(cfg, build_payload(event, label, max_conf, objects))
+            maybe_notify(cfg, build_payload(cfg, event, label, max_conf, objects))
     except Exception as e:  # noqa: BLE001
         cpu_ms = round(1000 * (time.process_time() - t_cpu))
         meta = {"engine": ENGINE, "detected": False, "label": "error",
