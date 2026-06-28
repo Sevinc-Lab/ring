@@ -47,12 +47,27 @@ export function normalizeLabel(raw: string | undefined): LabelFilter {
     : 'all'
 }
 
-function labelWhere(label: LabelFilter): { sql: string; params: string[] } {
-  return label === 'all' ? { sql: '', params: [] } : { sql: 'WHERE label = ?', params: [label] }
+function buildWhere(label: LabelFilter, deviceId?: string): { sql: string; params: string[] } {
+  const cond: string[] = []
+  const params: string[] = []
+  if (label !== 'all') {
+    cond.push('label = ?')
+    params.push(label)
+  }
+  if (deviceId) {
+    cond.push('device_id = ?')
+    params.push(deviceId)
+  }
+  return { sql: cond.length ? `WHERE ${cond.join(' AND ')}` : '', params }
 }
 
-export function listEvents(limit: number, offset: number, label: LabelFilter = 'all'): EventRow[] {
-  const w = labelWhere(label)
+export function listEvents(
+  limit: number,
+  offset: number,
+  label: LabelFilter = 'all',
+  deviceId?: string,
+): EventRow[] {
+  const w = buildWhere(label, deviceId)
   return db()
     .prepare(
       `SELECT ${SELECT_COLS} FROM events ${w.sql} ORDER BY started_at DESC, id DESC LIMIT ? OFFSET ?`,
@@ -108,8 +123,8 @@ export function listDevices(): DeviceRow[] {
     .all() as DeviceRow[]
 }
 
-export function countEvents(label: LabelFilter = 'all'): number {
-  const w = labelWhere(label)
+export function countEvents(label: LabelFilter = 'all', deviceId?: string): number {
+  const w = buildWhere(label, deviceId)
   const row = db().prepare(`SELECT COUNT(*) AS n FROM events ${w.sql}`).get(...w.params) as {
     n: number
   }

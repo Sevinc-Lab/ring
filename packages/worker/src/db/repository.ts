@@ -116,6 +116,22 @@ export class Repository {
       })
   }
 
+  /** Clip + thumb paths for one event (for local deletion), or undefined. */
+  getEventPaths(id: number): { clip_path: string | null; thumb_path: string | null } | undefined {
+    return this.db.prepare(`SELECT clip_path, thumb_path FROM events WHERE id = ?`).get(id) as
+      | { clip_path: string | null; thumb_path: string | null }
+      | undefined
+  }
+
+  /**
+   * Delete ONE event row from the local index. Returns true if a row was
+   * removed. This only ever touches our own SQLite — it never contacts Ring.
+   */
+  deleteEvent(id: number): boolean {
+    const info = this.db.prepare(`DELETE FROM events WHERE id = ?`).run(id)
+    return info.changes > 0
+  }
+
   close(): void {
     this.db.close()
   }

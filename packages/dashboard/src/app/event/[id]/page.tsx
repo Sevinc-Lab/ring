@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getEvent } from '@/lib/db'
 import { fmtTime, fmtColdStart, statusClass, labelText, labelClass } from '@/lib/format'
+import EventActions from './EventActions'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,8 @@ export default function EventPage({ params }: { params: { id: string } }) {
         {(ev.device_name ?? 'Kamera') + ' · ' + ev.kind}
       </h1>
       <p className="when">{fmtTime(ev.started_at)}</p>
+
+      <EventActions id={ev.id} clipPath={ev.clip_path} />
 
       {ev.clip_path ? (
         <div className="player">
