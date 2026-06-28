@@ -1,0 +1,86 @@
+# OPTIONALE, firmenfreie Fernzugriffs-Schiene (Alternative zu Tailscale).
+#
+# Komplett kostenlos & selbst gehostet: WireGuard (VPN) + DuckDNS (dyn. DNS) +
+# Caddy (HTTPS mit Let's-Encrypt-Zertifikat). Ändert das laufende Ring-System
+# NICHT — eigene Compose-Datei, separat zu starten:
+#
+#   cd ~/ring/remote-access
+#   cp .env.remote.example .env
+#   # .env + dnsmasq.conf mit deiner DuckDNS-Domain/Token ausfüllen (siehe docs/SELBST-VPN.md)
+#   docker compose -f docker-compose.remote.yml up -d
+#
+# Stoppen (zurück zu Tailscale): docker compose -f docker-compose.remote.yml down
+#
+# Voraussetzung: im Router UDP 51820 auf diesen Host weiterleiten + öffentliche IP
+# (kein CGNAT). Details + Umschalten: docs/SELBST-VPN.md
+
+services:
+  # --- WireGuard-Server mit Web-UI (QR-Code zum Einscannen aufs Handy) ---
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:13
+    container_name: ring-wg
+    environment:
+      - WG_HOST=${DASHBOARD_DOMAIN}          # z.B. meinring.duckdns.org
+      - PASSWORD=${WG_UI_PASSWORD}           # Login für die WG-Web-UI (:51821)
+      - WG_DEFAULT_ADDRESS=10.8.0.x          # Tunnel-Subnetz; Server = 10.8.0.1
+      - WG_DEFAULT_DNS=10.8.0.1              # Clients fragen den Tunnel-DNS (dnsmasq, s.u.)
+      - WG_ALLOWED_IPS=0.0.0.0/0, ::/0       # alles über den Tunnel (auch DNS)
+    volumes:
+      - ./wg-data:/etc/wireguard
+    ports:
+      - "51820:51820/udp"                    # WireGuard (im Router weiterleiten!)
+      - "51821:51821/tcp"                    # Web-UI (nur lokal/über Tunnel öffnen)
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+
+  # --- Split-DNS: löst deine Domain im Tunnel auf den WG-Server (10.8.0.1) auf,
+  #     damit das echte HTTPS-Zertifikat passt. Läuft IM Netz von wg-easy, ist
+  #     daher für die Clients unter 10.8.0.1:53 erreichbar. ---
+  dnsmasq:
+    image: 4km3/dnsmasq:2.90-r3
+    container_name: ring-wg-dns
+    network_mode: "service:wg-easy"
+    volumes:
+      - ./dnsmasq.conf:/etc/dnsmasq.conf:ro
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    depends_on:
+      - wg-easy
+
+  # --- HTTPS-Reverse-Proxy mit gratis Let's-Encrypt-Zertifikat über DuckDNS ---
+  caddy:
+    build: ./caddy
+    container_name: ring-caddy
+    environment:
+      - DASHBOARD_DOMAIN=${DASHBOARD_DOMAIN}
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
+      - DASHBOARD_UPSTREAM=http://host.docker.internal:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # erreicht das Dashboard auf dem Host (:8080)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "443:443"                            # erreichbar über die Tunnel-IP 10.8.0.1
+    restart: unless-stopped
+
+  # --- Hält die DuckDNS-Domain auf deine aktuelle Heim-IP aktuell ---
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: ring-duckdns
+    environment:
+      - SUBDOMAINS=${DUCKDNS_SUBDOMAIN}      # nur der Teil vor .duckdns.org
+      - TOKEN=${DUCKDNS_TOKEN}
+      - TZ=Europe/Berlin
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
