@@ -149,6 +149,23 @@ export class Repository {
     }[]
   }
 
+  /**
+   * Queue recorded clips for re-detection: reset label to 'unclassified' (and
+   * clear old tags/meta) so the detector reprocesses them with the current
+   * model. Pass ids for specific events, or omit for ALL recorded clips.
+   * Returns how many rows were queued.
+   */
+  requeueForRelabel(ids?: number[]): number {
+    const base = `UPDATE events
+       SET label = 'unclassified', objects = NULL, label_meta = NULL, error = NULL
+       WHERE recording_status = 'recorded' AND clip_path IS NOT NULL`
+    if (ids && ids.length) {
+      const placeholders = ids.map(() => '?').join(',')
+      return this.db.prepare(`${base} AND id IN (${placeholders})`).run(...ids).changes
+    }
+    return this.db.prepare(base).run().changes
+  }
+
   /** Clip + thumb paths for one event (for local deletion), or undefined. */
   getEventPaths(id: number): { clip_path: string | null; thumb_path: string | null } | undefined {
     return this.db.prepare(`SELECT clip_path, thumb_path FROM events WHERE id = ?`).get(id) as

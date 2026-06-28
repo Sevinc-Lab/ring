@@ -53,6 +53,7 @@ function readBody(req: IncomingMessage, limit = 200_000): Promise<string> {
  *   POST /device/siren?device=<id>&on=<bool>        -> { siren }
  *   POST /device/light?device=<id>&on=<bool>        -> { light }
  *   POST /events/delete?id=<n>                       -> { deleted }        (local only)
+ *   POST /events/relabel?ids=1,2 | ?all=1            -> { queued }         (re-detect)
  *   POST /live/record?device=<id>&seconds=<n>  body=webm -> { id }         (save live clip)
  */
 export function startLiveServer(
@@ -131,6 +132,26 @@ export function startLiveServer(
           send(200, { deleted, requested: ids.length })
         })().catch(fail)
         return
+      }
+
+      // Re-detect: reset events to 'unclassified' so the detector reprocesses
+      // them with the current model. ?all=1 for every recorded clip, or ?ids=.
+      if (req.method === 'POST' && url.pathname === '/events/relabel') {
+        if (!repo) return send(503, { error: 'relabel not available' })
+        const all = url.searchParams.get('all') === '1'
+        if (all) {
+          const queued = repo.requeueForRelabel()
+          log.info({ queued }, '🔄 Re-queued all clips for detection')
+          return send(200, { queued })
+        }
+        const raw = url.searchParams.get('ids') ?? url.searchParams.get('id') ?? ''
+        const ids = [...new Set(raw.split(',').map((s) => Number(s.trim())))].filter(
+          (n) => Number.isInteger(n) && n > 0,
+        )
+        if (ids.length === 0) return send(400, { error: 'no valid id(s)' })
+        const queued = repo.requeueForRelabel(ids)
+        log.info({ queued, ids: ids.length }, '🔄 Re-queued clips for detection')
+        return send(200, { queued })
       }
 
       if (!camera) return send(404, { error: 'no camera' })

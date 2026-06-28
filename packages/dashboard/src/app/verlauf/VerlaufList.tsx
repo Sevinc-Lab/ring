@@ -27,6 +27,7 @@ export default function VerlaufList({ events }: { events: VEvent[] }) {
   const [picked, setPicked] = useState<Set<number>>(new Set())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [note, setNote] = useState('')
 
   const toggle = (id: number) =>
     setPicked((prev) => {
@@ -66,6 +67,34 @@ export default function VerlaufList({ events }: { events: VEvent[] }) {
     }
   }
 
+  async function relabelAll() {
+    if (
+      !window.confirm(
+        'Alle Aufnahmen neu erkennen lassen? Der Detektor verarbeitet sie im Hintergrund mit dem aktuellen Modell — das kann je nach Anzahl etwas dauern.',
+      )
+    )
+      return
+    setBusy(true)
+    setError('')
+    setNote('')
+    try {
+      const r = await fetch('/api/events/relabel?all=1', { method: 'POST' })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        setError(data.error ? `Fehlgeschlagen: ${data.error}` : 'Neu-Erkennen fehlgeschlagen.')
+        return
+      }
+      setNote(
+        `${data.queued ?? 0} Aufnahme(n) eingereiht — werden im Hintergrund neu erkannt. Seite später aktualisieren.`,
+      )
+      router.refresh()
+    } catch {
+      setError('Worker nicht erreichbar.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <>
       <div className="listBar">
@@ -91,10 +120,16 @@ export default function VerlaufList({ events }: { events: VEvent[] }) {
             </button>
           </>
         ) : (
-          <button type="button" className="actBtn" onClick={() => setSelecting(true)}>
-            ☑ Auswählen
-          </button>
+          <>
+            <button type="button" className="actBtn" onClick={() => setSelecting(true)}>
+              ☑ Auswählen
+            </button>
+            <button type="button" className="actBtn" onClick={relabelAll} disabled={busy}>
+              {busy ? '… reiht ein' : '🔄 Alle neu erkennen'}
+            </button>
+          </>
         )}
+        {note ? <span className="muted">{note}</span> : null}
         {error ? <span className="liveerr">⚠ {error}</span> : null}
       </div>
 
