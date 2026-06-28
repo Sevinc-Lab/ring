@@ -5,6 +5,7 @@ const MEDIA_ROOT = resolve(process.env.DATA_MEDIA_DIR || '/data/media')
 
 const MIME: Record<string, string> = {
   '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',

@@ -378,6 +378,23 @@ a {
   padding: 4px 10px;
   border-radius: 999px;
 }
+.recDot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--fail);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  animation: recpulse 1.4s ease-in-out infinite;
+}
+@keyframes recpulse {
+  50% {
+    opacity: 0.45;
+  }
+}
 .player video {
   width: 100%;
   display: block;

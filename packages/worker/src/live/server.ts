@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage } from 'http'
+import { mkdir, writeFile } from 'fs/promises'
 import type { RingCamera } from 'ring-client-api'
 import type { Logger } from '../log'
 import type { LiveManager } from './liveManager'
@@ -6,6 +7,27 @@ import type { WebRtcManager } from './webrtcManager'
 import type { SirenManager } from './sirenManager'
 import type { Repository } from '../db/repository'
 import { removeMediaFile } from '../mediaFs'
+import { buildClipPaths } from '../recorder/paths'
+import { extractFirstFrame } from '../recorder/thumbnail'
+
+/** Collect a binary request body (live recording upload) up to `limit` bytes. */
+function readBinary(req: IncomingMessage, limit: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    let size = 0
+    req.on('data', (c: Buffer) => {
+      size += c.length
+      if (size > limit) {
+        reject(new Error('recording too large'))
+        req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+}
 
 function readBody(req: IncomingMessage, limit = 200_000): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -31,6 +53,7 @@ function readBody(req: IncomingMessage, limit = 200_000): Promise<string> {
  *   POST /device/siren?device=<id>&on=<bool>        -> { siren }
  *   POST /device/light?device=<id>&on=<bool>        -> { light }
  *   POST /events/delete?id=<n>                       -> { deleted }        (local only)
+ *   POST /live/record?device=<id>&seconds=<n>  body=webm -> { id }         (save live clip)
  */
 export function startLiveServer(
   port: number,
@@ -176,6 +199,42 @@ export function startLiveServer(
           void webrtc.stop(id)
           hls.stop(id)
           return send(200, { ok: true })
+        case '/live/record': {
+          // The browser recorded the live WebRTC stream and uploads the webm
+          // here; we save it as a normal event so it appears in the Verlauf.
+          if (!repo || !mediaRoot) return send(503, { error: 'recording not available' })
+          const repoRef = repo
+          const rootRef = mediaRoot
+          const seconds = Number(url.searchParams.get('seconds')) || null
+          readBinary(req, 300_000_000)
+            .then(async (buf) => {
+              if (buf.length < 1024) return send(400, { error: 'empty recording' })
+              const whenMs = Date.now()
+              const p = buildClipPaths(rootRef, id, 'live', whenMs, 'webm')
+              await mkdir(p.dirAbs, { recursive: true })
+              await writeFile(p.clipAbs, buf)
+              const thumb = await extractFirstFrame(p.clipAbs, p.thumbAbs, log)
+              const evId = repoRef.insertEvent({
+                deviceId: id,
+                deviceName: camera.name,
+                kind: 'live',
+                startedAt: new Date(whenMs).toISOString(),
+                recordingStatus: 'recorded',
+              })
+              if (evId != null) {
+                repoRef.updateRecording(evId, {
+                  recordingStatus: 'recorded',
+                  clipPath: p.clipRel,
+                  thumbPath: thumb ? p.thumbRel : null,
+                  clipSeconds: seconds,
+                })
+              }
+              log.info({ deviceId: id, bytes: buf.length, evId }, '⏺ Saved live recording')
+              send(200, { ok: true, id: evId })
+            })
+            .catch(fail)
+          return
+        }
         default:
           return send(404, { error: 'not found' })
       }
