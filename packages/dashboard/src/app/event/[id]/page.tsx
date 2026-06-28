@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getEvent } from '@/lib/db'
-import { fmtTime, fmtColdStart, statusClass, labelText, labelClass } from '@/lib/format'
+import { fmtTime, fmtColdStart, statusClass, labelText, labelClass, kindText } from '@/lib/format'
 import EventActions from './EventActions'
 import ClipPlayer from './ClipPlayer'
 
@@ -29,7 +29,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
       </Link>
 
       <h1>
-        {(ev.device_name ?? 'Kamera') + ' · ' + ev.kind}
+        {(ev.device_name ?? 'Kamera') + ' · ' + kindText(ev.kind)}
       </h1>
       <p className="when">{fmtTime(ev.started_at)}</p>
 

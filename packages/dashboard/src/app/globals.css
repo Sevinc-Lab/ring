@@ -692,3 +692,72 @@ dl.facts dd {
   background: var(--accent);
   border-color: var(--accent);
 }
+
+/* doorbell "incoming call" overlay */
+.callOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(3px);
+}
+.callCard {
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid #2f3744;
+  border-radius: 18px;
+  padding: 36px 28px;
+  max-width: 360px;
+  width: 86%;
+}
+.callCard h2 {
+  margin: 8px 0 2px;
+  font-size: 24px;
+}
+.callWho {
+  color: var(--muted);
+  font-size: 16px;
+  margin: 0 0 24px;
+}
+.callPulse {
+  font-size: 64px;
+  line-height: 1;
+  animation: callpulse 1s ease-in-out infinite;
+}
+@keyframes callpulse {
+  0%,
+  100% {
+    transform: scale(1) rotate(-8deg);
+  }
+  50% {
+    transform: scale(1.18) rotate(8deg);
+  }
+}
+.callBtns {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+.callBtn {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 14px 20px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  flex: 1 1 0;
+}
+.callBtn.answer {
+  background: var(--ok);
+  color: #06210f;
+}
+.callBtn.decline {
+  background: var(--fail);
+  color: #2a0c0a;
+}
+.callBtn:active {
+  transform: scale(0.97);
+}

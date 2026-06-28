@@ -30,7 +30,13 @@ function waitIceComplete(pc: RTCPeerConnection, timeoutMs: number): Promise<void
  * toggles talk. Keep-alive pings keep it up while watching; the worker
  * auto-stops on idle / max duration.
  */
-export default function LivePlayer({ deviceId }: { deviceId: string }) {
+export default function LivePlayer({
+  deviceId,
+  autoTalk = false,
+}: {
+  deviceId: string
+  autoTalk?: boolean
+}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const micTrackRef = useRef<MediaStreamTrack | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -159,10 +165,11 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
       if (cancelled) return
       if (micStream) {
         const track = micStream.getAudioTracks()[0]
-        track.enabled = false // muted until the user taps "talk"
+        track.enabled = autoTalk // hands-free immediately when answering a doorbell call
         micTrackRef.current = track
         pc.addTrack(track, micStream)
         setMicReady(true)
+        if (autoTalk) setTalking(true)
       } else {
         pc.addTransceiver('audio', { direction: 'recvonly' })
       }
@@ -218,7 +225,7 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
       window.removeEventListener('pagehide', onPageHide)
       stopRemote()
     }
-  }, [deviceId])
+  }, [deviceId, autoTalk])
 
   const toggleTalk = () => {
     const t = micTrackRef.current

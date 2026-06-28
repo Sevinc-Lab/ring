@@ -115,6 +115,23 @@ export function getEvent(id: number): EventRow | undefined {
     .get(id) as EventRow | undefined
 }
 
+export interface DingRow {
+  id: number
+  device_id: string
+  device_name: string | null
+  started_at: string
+}
+
+/** The most recent doorbell-press event (for the live "es klingelt" ring). */
+export function getLatestDing(): DingRow | undefined {
+  return db()
+    .prepare(
+      `SELECT id, device_id, device_name, started_at FROM events
+       WHERE kind = 'ding' ORDER BY id DESC LIMIT 1`,
+    )
+    .get() as DingRow | undefined
+}
+
 /** Most recently seen camera id (for the live view default). */
 export function getLatestDeviceId(): string | null {
   const row = db().prepare(`SELECT device_id FROM events ORDER BY id DESC LIMIT 1`).get() as

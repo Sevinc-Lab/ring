@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import './globals.css'
 import Nav from './Nav'
+import DoorbellWatcher from './DoorbellWatcher'
 
 export const metadata = {
   title: 'Ring NVR',
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <Nav />
         {children}
+        <DoorbellWatcher />
       </body>
     </html>
   )

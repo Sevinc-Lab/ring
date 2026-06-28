@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export default function LivePage({
   searchParams,
 }: {
-  searchParams: { device?: string }
+  searchParams: { device?: string; talk?: string }
 }) {
   // Prefer the camera picked on the Dashboard; fall back to the most recent one.
   let deviceId = searchParams.device ?? ''
@@ -20,6 +20,7 @@ export default function LivePage({
       deviceId = ''
     }
   }
+  const autoTalk = searchParams.talk === '1' // answered a doorbell call → hands-free
   return (
     <div className="wrap">
       <div className="topbar">
@@ -29,7 +30,7 @@ export default function LivePage({
           ← Dashboard
         </Link>
       </div>
-      <LivePlayer deviceId={deviceId} />
+      <LivePlayer deviceId={deviceId} autoTalk={autoTalk} />
       <DeviceControls deviceId={deviceId} />
     </div>
   )

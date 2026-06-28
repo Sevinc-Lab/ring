@@ -34,6 +34,20 @@ export function statusClass(status: string): string {
   }
 }
 
+/** Human text for an event kind. */
+export function kindText(kind: string): string {
+  switch (kind) {
+    case 'motion':
+      return 'Bewegung'
+    case 'ding':
+      return '🔔 Klingel'
+    case 'live':
+      return 'Live'
+    default:
+      return kind
+  }
+}
+
 /** Human label text (M4b). */
 export function labelText(label: string): string {
   switch (label) {

@@ -135,6 +135,7 @@ async function main(): Promise<void> {
     mediaRoot: config.DATA_MEDIA_DIR,
     clipSeconds: config.CLIP_SECONDS,
     log,
+    dingWebhookUrl: config.DING_WEBHOOK_URL || undefined,
   }
   for (const cam of selected) {
     subscribeCamera(cam, motionCtx)
