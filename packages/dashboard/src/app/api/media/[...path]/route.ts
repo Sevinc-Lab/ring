@@ -89,6 +89,12 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
     'Cache-Control': isLivePath(params.path) ? 'no-store' : 'private, max-age=60',
   }
 
+  // ?download=1 → force a file download (Save As) instead of inline playback.
+  if (req.nextUrl.searchParams.get('download')) {
+    const name = params.path[params.path.length - 1] || 'clip.mp4'
+    baseHeaders['Content-Disposition'] = `attachment; filename="${name.replace(/["\\]/g, '')}"`
+  }
+
   const range = req.headers.get('range')
   if (range) {
     const m = /^bytes=(\d*)-(\d*)$/.exec(range.trim())

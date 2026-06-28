@@ -529,3 +529,66 @@ dl.facts dd {
   color: var(--fail);
   border-color: #5a221c;
 }
+
+/* camera dropdown (Verlauf) */
+.camSelect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  background: var(--panel);
+  border: 1px solid #2f3744;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.camSelect .camSelIcon {
+  font-size: 13px;
+}
+.camSelect select {
+  background: transparent;
+  color: var(--text);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 4px;
+  cursor: pointer;
+  outline: none;
+}
+.camSelect select option {
+  background: var(--panel);
+  color: var(--text);
+}
+
+/* event detail actions (download / delete) */
+.eventActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 18px;
+}
+.actBtn {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: 1px solid #2f3744;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+.actBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.actBtn.delete {
+  color: var(--fail);
+  border-color: #5a221c;
+}
+.actBtn.delete:hover:not(:disabled) {
+  background: #1f1416;
+  border-color: var(--fail);
+}
+.actBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

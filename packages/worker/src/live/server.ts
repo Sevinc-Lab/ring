@@ -1,8 +1,25 @@
 import { createServer, type IncomingMessage } from 'http'
+import { unlink } from 'fs/promises'
+import { resolve, sep } from 'path'
 import type { RingCamera } from 'ring-client-api'
 import type { Logger } from '../log'
 import type { LiveManager } from './liveManager'
 import type { WebRtcManager } from './webrtcManager'
+import type { Repository } from '../db/repository'
+
+/** Best-effort unlink of a media file, constrained to mediaRoot. Missing files
+ *  are fine (already gone). Returns true if the path was inside the root. */
+async function removeMediaFile(mediaRoot: string, rel: string | null): Promise<void> {
+  if (!rel) return
+  const root = resolve(mediaRoot)
+  const abs = resolve(root, rel)
+  if (abs !== root && !abs.startsWith(root + sep)) return // never escape the media root
+  try {
+    await unlink(abs)
+  } catch {
+    /* already gone — fine */
+  }
+}
 
 function readBody(req: IncomingMessage, limit = 200_000): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -27,16 +44,17 @@ function readBody(req: IncomingMessage, limit = 200_000): Promise<string> {
  *   GET  /device/caps?device=<id>                   -> { hasSiren, hasLight, ... }
  *   POST /device/siren?device=<id>&on=<bool>        -> { siren }
  *   POST /device/light?device=<id>&on=<bool>        -> { light }
+ *   POST /events/delete?id=<n>                       -> { deleted }        (local only)
  */
 export function startLiveServer(
   port: number,
   cameras: RingCamera[],
-  managers: { hls: LiveManager; webrtc: WebRtcManager },
+  managers: { hls: LiveManager; webrtc: WebRtcManager; repo?: Repository; mediaRoot?: string },
   log: Logger,
 ): void {
   const byId = new Map(cameras.map((c) => [String(c.id), c]))
   const fallback = cameras[0]
-  const { hls, webrtc } = managers
+  const { hls, webrtc, repo, mediaRoot } = managers
 
   const server = createServer((req, res) => {
     const send = (code: number, body: unknown) => {
@@ -70,6 +88,28 @@ export function startLiveServer(
             operatingOnBattery: c.operatingOnBattery,
           })),
         )
+      }
+
+      // Delete one event LOCALLY: remove its clip + thumbnail from the SATA
+      // media dir and its row from our SQLite index. This never contacts Ring —
+      // it only removes what we recorded on CasaOS.
+      if (req.method === 'POST' && url.pathname === '/events/delete') {
+        if (!repo || !mediaRoot) return send(503, { error: 'delete not available' })
+        const id = Number(url.searchParams.get('id'))
+        if (!Number.isInteger(id) || id <= 0) return send(400, { error: 'bad id' })
+        const ev = repo.getEventPaths(id)
+        if (!ev) return send(404, { error: 'event not found' })
+        Promise.all([
+          removeMediaFile(mediaRoot, ev.clip_path),
+          removeMediaFile(mediaRoot, ev.thumb_path),
+        ])
+          .then(() => {
+            const deleted = repo.deleteEvent(id)
+            log.info({ id, deleted }, '🗑 Deleted local event (clip+thumb+row) — Ring untouched')
+            send(200, { deleted, id })
+          })
+          .catch(fail)
+        return
       }
 
       if (!camera) return send(404, { error: 'no camera' })

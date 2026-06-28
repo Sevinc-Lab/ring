@@ -150,7 +150,12 @@ async function main(): Promise<void> {
       config.LIVE_IDLE_TIMEOUT_SECONDS * 1000,
       log,
     )
-    startLiveServer(config.LIVE_PORT, selected, { hls: live, webrtc }, log)
+    startLiveServer(
+      config.LIVE_PORT,
+      selected,
+      { hls: live, webrtc, repo, mediaRoot: config.DATA_MEDIA_DIR },
+      log,
+    )
   }
 
   log.info(
