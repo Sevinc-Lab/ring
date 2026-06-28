@@ -40,6 +40,12 @@ const EnvSchema = z.object({
   LIVE_PORT: z.coerce.number().int().positive().default(8081),
   LIVE_MAX_SECONDS: z.coerce.number().int().positive().max(1800).default(120),
   LIVE_IDLE_TIMEOUT_SECONDS: z.coerce.number().int().positive().max(300).default(15),
+
+  // Siren dead-man's switch. While on, the browser pings; if pings stop for
+  // SIREN_GRACE_SECONDS (device unreachable / tab closed) it auto-offs. The hard
+  // cap SIREN_MAX_SECONDS turns it off no matter what (forgotten tab guard).
+  SIREN_GRACE_SECONDS: z.coerce.number().int().positive().max(120).default(15),
+  SIREN_MAX_SECONDS: z.coerce.number().int().positive().max(1800).default(300),
 })
 
 export type Config = z.infer<typeof EnvSchema>

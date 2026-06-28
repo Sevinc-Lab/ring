@@ -168,6 +168,11 @@ a {
 .deviceCtl .liveerr {
   flex-basis: 100%;
 }
+.deviceCtl .sirenHint {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 13px;
+}
 .muted {
   color: var(--muted);
 }
