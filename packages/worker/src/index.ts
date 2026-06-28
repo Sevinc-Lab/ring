@@ -136,6 +136,8 @@ async function main(): Promise<void> {
     clipSeconds: config.CLIP_SECONDS,
     log,
     dingWebhookUrl: config.DING_WEBHOOK_URL || undefined,
+    ntfyUrl: config.NTFY_URL || undefined,
+    dashboardBaseUrl: config.DASHBOARD_BASE_URL || undefined,
   }
   for (const cam of selected) {
     subscribeCamera(cam, motionCtx)
