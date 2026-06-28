@@ -34,6 +34,12 @@ const EnvSchema = z.object({
   // n8n → Telegram webhook the detector uses) for an immediate "es klingelt"
   // push. Empty = skip. Best-effort; never blocks recording.
   DING_WEBHOOK_URL: z.string().optional().default(''),
+  // Optional: ntfy topic URL (e.g. http://ntfy/haustuer) for a LOUD phone alarm
+  // on doorbell press — rings even when locked, with an "Annehmen" button + image.
+  NTFY_URL: z.string().optional().default(''),
+  // Dashboard base URL (e.g. the Tailscale https URL) used to build tap-to-answer
+  // links + image URLs in doorbell notifications.
+  DASHBOARD_BASE_URL: z.string().optional().default(''),
   // Watchdog: cleanly restart every N hours so the (sometimes-stale) Ring push
   // connection is refreshed. 0 = disabled. Far below any re-auth throttle.
   WORKER_RESTART_HOURS: z.coerce.number().min(0).max(168).default(0),
