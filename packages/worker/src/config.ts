@@ -33,6 +33,13 @@ const EnvSchema = z.object({
   // Watchdog: cleanly restart every N hours so the (sometimes-stale) Ring push
   // connection is refreshed. 0 = disabled. Far below any re-auth throttle.
   WORKER_RESTART_HOURS: z.coerce.number().min(0).max(168).default(0),
+
+  // Live view (on-demand). The control server is reached by the dashboard over
+  // the compose network only (not published to the host).
+  LIVE_ENABLED: boolFromEnv(true),
+  LIVE_PORT: z.coerce.number().int().positive().default(8081),
+  LIVE_MAX_SECONDS: z.coerce.number().int().positive().max(1800).default(120),
+  LIVE_IDLE_TIMEOUT_SECONDS: z.coerce.number().int().positive().max(300).default(15),
 })
 
 export type Config = z.infer<typeof EnvSchema>

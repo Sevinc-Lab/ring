@@ -66,6 +66,14 @@ export function getEvent(id: number): EventRow | undefined {
     .get(id) as EventRow | undefined
 }
 
+/** Most recently seen camera id (for the live view default). */
+export function getLatestDeviceId(): string | null {
+  const row = db().prepare(`SELECT device_id FROM events ORDER BY id DESC LIMIT 1`).get() as
+    | { device_id: string }
+    | undefined
+  return row?.device_id ?? null
+}
+
 export function countEvents(label: LabelFilter = 'all'): number {
   const w = labelWhere(label)
   const row = db().prepare(`SELECT COUNT(*) AS n FROM events ${w.sql}`).get(...w.params) as {

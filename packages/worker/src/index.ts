@@ -5,6 +5,8 @@ import { TokenStore } from './auth/tokenStore'
 import { createRingApi } from './auth/ringClient'
 import { Repository } from './db/repository'
 import { subscribeCamera } from './events/subscriber'
+import { LiveManager } from './live/liveManager'
+import { startLiveServer } from './live/server'
 import type { RingApi, RingCamera } from 'ring-client-api'
 
 const HEARTBEAT_INTERVAL_MS = 60_000
@@ -28,9 +30,15 @@ async function main(): Promise<void> {
 
   let ringApi: RingApi | undefined
   let heartbeat: NodeJS.Timeout | undefined
+  let live: LiveManager | undefined
 
   const shutdown = (code: number): never => {
     if (heartbeat) clearInterval(heartbeat)
+    try {
+      live?.stopAll()
+    } catch {
+      /* ignore */
+    }
     try {
       ringApi?.disconnect()
     } catch {
@@ -113,6 +121,18 @@ async function main(): Promise<void> {
   }
   for (const cam of selected) {
     subscribeCamera(cam, motionCtx)
+  }
+
+  // On-demand live view control server (reached by the dashboard over the
+  // compose network). Battery-safe: streams only while a viewer keeps it alive.
+  if (config.LIVE_ENABLED) {
+    live = new LiveManager(
+      config.DATA_MEDIA_DIR,
+      config.LIVE_MAX_SECONDS,
+      config.LIVE_IDLE_TIMEOUT_SECONDS * 1000,
+      log,
+    )
+    startLiveServer(config.LIVE_PORT, selected, live, log)
   }
 
   log.info(

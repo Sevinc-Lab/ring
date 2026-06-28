@@ -9,6 +9,13 @@ const MIME: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.webp': 'image/webp',
+  '.m3u8': 'application/vnd.apple.mpegurl',
+  '.ts': 'video/mp2t',
+}
+
+/** Live HLS (playlist + segments) must never be cached — they update constantly. */
+export function isLivePath(parts: string[]): boolean {
+  return parts[0] === 'live' || (parts[parts.length - 1] ?? '').toLowerCase().endsWith('.m3u8')
 }
 
 /**
