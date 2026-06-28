@@ -103,6 +103,44 @@ a {
   opacity: 0.5;
   cursor: default;
 }
+.deviceCtl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 4px;
+  max-width: 960px;
+}
+.ctlBtn {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: 1px solid #333a47;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  flex: 1 1 auto;
+}
+.ctlBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.ctlBtn.siren.on {
+  background: #2a1416;
+  border-color: var(--fail);
+  color: var(--fail);
+}
+.ctlBtn.light.on {
+  background: #2a2410;
+  border-color: #d8b73a;
+  color: #e7c84a;
+}
+.ctlBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.deviceCtl .liveerr {
+  flex-basis: 100%;
+}
 .muted {
   color: var(--muted);
 }

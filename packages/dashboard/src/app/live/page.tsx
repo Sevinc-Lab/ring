@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getLatestDeviceId } from '@/lib/db'
 import LivePlayer from './LivePlayer'
+import DeviceControls from './DeviceControls'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,7 @@ export default function LivePage() {
         </Link>
       </div>
       <LivePlayer deviceId={deviceId} />
+      <DeviceControls deviceId={deviceId} />
     </div>
   )
 }
