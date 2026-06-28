@@ -9,6 +9,24 @@ export interface MotionContext {
   mediaRoot: string
   clipSeconds: number
   log: Logger
+  /** Optional webhook fired the instant a doorbell is pressed (best-effort). */
+  dingWebhookUrl?: string
+}
+
+/** Best-effort "es klingelt" webhook (e.g. n8n → Telegram). Never throws. */
+function notifyDing(ctx: MotionContext, deviceName: string, startedAt: string): void {
+  const url = ctx.dingWebhookUrl
+  if (!url) return
+  void fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'ding',
+      title: '🔔🔔 ES KLINGELT',
+      device: deviceName,
+      started_at: startedAt,
+    }),
+  }).catch((err) => ctx.log.warn({ err }, 'ding webhook failed (ignored)'))
 }
 
 /**
@@ -65,10 +83,38 @@ export function subscribeCamera(camera: RingCamera, ctx: MotionContext): void {
     }
 
     recording = true
-    void recordMotion(camera, ctx, rowId, whenMs).finally(() => {
+    void recordEvent(camera, ctx, rowId, whenMs, 'motion').finally(() => {
       recording = false
     })
   })
+
+  // Doorbell press ('ding'). Only doorbells emit this. We ALWAYS log the press
+  // immediately (so the dashboard can ring instantly) + fire the optional
+  // webhook, then record a clip if the camera isn't already recording.
+  const pressed = (camera as unknown as { onDoorbellPressed?: { subscribe: (cb: () => void) => void } })
+    .onDoorbellPressed
+  if (camera.isDoorbot && typeof pressed?.subscribe === 'function') {
+    pressed.subscribe(() => {
+      const startedAt = new Date().toISOString()
+      const whenMs = Date.now()
+      log.info({ deviceId, deviceName, startedAt }, '🔔🔔 DOORBELL pressed')
+      notifyDing(ctx, deviceName, startedAt)
+      const rowId = repo.insertEvent({
+        deviceId,
+        deviceName,
+        kind: 'ding',
+        startedAt,
+        recordingStatus: recording ? 'event_only' : 'pending',
+      })
+      if (rowId !== null && !recording) {
+        recording = true
+        void recordEvent(camera, ctx, rowId, whenMs, 'ding').finally(() => {
+          recording = false
+        })
+      }
+    })
+    log.info({ deviceId, deviceName }, 'Subscribed to doorbell-press events')
+  }
 
   // Best-effort richer metadata for debugging only.
   //
@@ -90,14 +136,15 @@ export function subscribeCamera(camera: RingCamera, ctx: MotionContext): void {
   log.info({ deviceId, deviceName }, 'Subscribed to motion events')
 }
 
-async function recordMotion(
+async function recordEvent(
   camera: RingCamera,
   ctx: MotionContext,
   rowId: number,
   whenMs: number,
+  kind: string,
 ): Promise<void> {
   const { repo, mediaRoot, clipSeconds, log } = ctx
-  const paths = buildClipPaths(mediaRoot, String(camera.id), 'motion', whenMs)
+  const paths = buildClipPaths(mediaRoot, String(camera.id), kind, whenMs)
 
   try {
     const result = await recordClip(camera, paths, clipSeconds, log)

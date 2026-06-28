@@ -9,7 +9,7 @@ import {
   type DeviceRow,
   type LabelFilter,
 } from '@/lib/db'
-import { fmtTime, statusClass, labelText, labelClass } from '@/lib/format'
+import { fmtTime, statusClass, labelText, labelClass, kindText } from '@/lib/format'
 import CameraSelect from './CameraSelect'
 import ObjectSelect from './ObjectSelect'
 import VerlaufList, { type VEvent } from './VerlaufList'
@@ -34,7 +34,7 @@ function toView(e: EventRow): VEvent {
     thumbUrl: e.thumb_path ? `/api/media/${e.thumb_path}` : null,
     hasClip: !!e.clip_path,
     time: fmtTime(e.started_at),
-    sub: (e.device_name ?? 'Kamera') + ' · ' + e.kind,
+    sub: (e.device_name ?? 'Kamera') + ' · ' + kindText(e.kind),
     labelText: labelText(e.label),
     labelClass: labelClass(e.label),
     status: e.recording_status,
