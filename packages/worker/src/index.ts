@@ -6,6 +6,7 @@ import { createRingApi } from './auth/ringClient'
 import { Repository } from './db/repository'
 import { subscribeCamera } from './events/subscriber'
 import { LiveManager } from './live/liveManager'
+import { WebRtcManager } from './live/webrtcManager'
 import { startLiveServer } from './live/server'
 import type { RingApi, RingCamera } from 'ring-client-api'
 
@@ -31,11 +32,13 @@ async function main(): Promise<void> {
   let ringApi: RingApi | undefined
   let heartbeat: NodeJS.Timeout | undefined
   let live: LiveManager | undefined
+  let webrtc: WebRtcManager | undefined
 
   const shutdown = (code: number): never => {
     if (heartbeat) clearInterval(heartbeat)
     try {
       live?.stopAll()
+      void webrtc?.stopAll()
     } catch {
       /* ignore */
     }
@@ -132,7 +135,12 @@ async function main(): Promise<void> {
       config.LIVE_IDLE_TIMEOUT_SECONDS * 1000,
       log,
     )
-    startLiveServer(config.LIVE_PORT, selected, live, log)
+    webrtc = new WebRtcManager(
+      config.LIVE_MAX_SECONDS,
+      config.LIVE_IDLE_TIMEOUT_SECONDS * 1000,
+      log,
+    )
+    startLiveServer(config.LIVE_PORT, selected, { hls: live, webrtc }, log)
   }
 
   log.info(

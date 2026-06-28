@@ -76,6 +76,33 @@ a {
   font-size: 14px;
   margin: 12px 0;
 }
+.talkRow {
+  margin: 14px 0 4px;
+}
+.talkBtn {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: 1px solid #333a47;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  width: 100%;
+  max-width: 960px;
+}
+.talkBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.talkBtn.on {
+  background: #2a1416;
+  border-color: var(--fail);
+  color: var(--fail);
+}
+.talkBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .muted {
   color: var(--muted);
 }
