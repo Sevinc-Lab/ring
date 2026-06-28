@@ -22,6 +22,7 @@ export interface EventRow {
   clip_seconds: number | null
   cold_start_ms: number | null
   label: string
+  objects: string | null
 }
 
 let _db: Database.Database | null = null
@@ -35,10 +36,10 @@ function db(): Database.Database {
 }
 
 const SELECT_COLS = `id, device_id, device_name, kind, started_at, recording_status,
-  clip_path, thumb_path, clip_seconds, cold_start_ms, label`
+  clip_path, thumb_path, clip_seconds, cold_start_ms, label, objects`
 
 /** Whitelisted label filters (M4b). 'all' = no filter. */
-export const LABEL_FILTERS = ['all', 'person', 'dog', 'cat', 'none', 'unclassified'] as const
+export const LABEL_FILTERS = ['all', 'person', 'dog', 'cat', 'car', 'none', 'unclassified'] as const
 export type LabelFilter = (typeof LABEL_FILTERS)[number]
 
 export function normalizeLabel(raw: string | undefined): LabelFilter {
@@ -47,7 +48,11 @@ export function normalizeLabel(raw: string | undefined): LabelFilter {
     : 'all'
 }
 
-function buildWhere(label: LabelFilter, deviceId?: string): { sql: string; params: string[] } {
+function buildWhere(
+  label: LabelFilter,
+  deviceId?: string,
+  object?: string,
+): { sql: string; params: string[] } {
   const cond: string[] = []
   const params: string[] = []
   if (label !== 'all') {
@@ -58,6 +63,11 @@ function buildWhere(label: LabelFilter, deviceId?: string): { sql: string; param
     cond.push('device_id = ?')
     params.push(deviceId)
   }
+  if (object) {
+    // Tags are stored as ",person,laptop,cup," — match a whole tag.
+    cond.push('objects LIKE ?')
+    params.push(`%,${object},%`)
+  }
   return { sql: cond.length ? `WHERE ${cond.join(' AND ')}` : '', params }
 }
 
@@ -66,13 +76,24 @@ export function listEvents(
   offset: number,
   label: LabelFilter = 'all',
   deviceId?: string,
+  object?: string,
 ): EventRow[] {
-  const w = buildWhere(label, deviceId)
+  const w = buildWhere(label, deviceId, object)
   return db()
     .prepare(
       `SELECT ${SELECT_COLS} FROM events ${w.sql} ORDER BY started_at DESC, id DESC LIMIT ? OFFSET ?`,
     )
     .all(...w.params, limit, offset) as EventRow[]
+}
+
+/** Distinct object tags seen across all events (for the Verlauf object filter). */
+export function listObjectTags(): string[] {
+  const rows = db()
+    .prepare(`SELECT DISTINCT objects FROM events WHERE objects IS NOT NULL AND objects != ''`)
+    .all() as { objects: string }[]
+  const set = new Set<string>()
+  for (const r of rows) for (const t of r.objects.split(',')) if (t) set.add(t)
+  return [...set].sort()
 }
 
 export function getEvent(id: number): EventRow | undefined {
@@ -123,8 +144,12 @@ export function listDevices(): DeviceRow[] {
     .all() as DeviceRow[]
 }
 
-export function countEvents(label: LabelFilter = 'all', deviceId?: string): number {
-  const w = buildWhere(label, deviceId)
+export function countEvents(
+  label: LabelFilter = 'all',
+  deviceId?: string,
+  object?: string,
+): number {
+  const w = buildWhere(label, deviceId, object)
   const row = db().prepare(`SELECT COUNT(*) AS n FROM events ${w.sql}`).get(...w.params) as {
     n: number
   }
