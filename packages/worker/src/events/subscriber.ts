@@ -231,10 +231,12 @@ async function recordEvent(
       '🎥 Clip recorded',
     )
     // For a doorbell press, follow up with the captured image once it exists.
+    // Priority "low" = silent (no sound/vibration) so it doesn't ring a SECOND
+    // time — the loud alarm already fired on the press.
     if (kind === 'ding' && result.thumbCreated) {
       notifyNtfy(ctx, {
         message: `📷 Bild von der Tür (${camera.name})`,
-        priority: 'high',
+        priority: 'low',
         click: answerLink(ctx, String(camera.id)),
         attach: mediaLink(ctx, paths.thumbRel),
       })
