@@ -25,11 +25,12 @@ export function buildClipPaths(
   deviceId: string,
   kind: string,
   whenMs: number,
+  ext = 'mp4',
 ): ClipPaths {
   const day = new Date(whenMs).toISOString().slice(0, 10) // YYYY-MM-DD (UTC)
   const base = `${whenMs}_${kind}`
   const relDir = join(deviceId, day)
-  const clipRel = join(relDir, `${base}.mp4`)
+  const clipRel = join(relDir, `${base}.${ext}`)
   const thumbRel = join(relDir, `${base}.jpg`)
   return {
     dirAbs: join(mediaRoot, relDir),

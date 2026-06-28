@@ -33,22 +33,77 @@ function waitIceComplete(pc: RTCPeerConnection, timeoutMs: number): Promise<void
 export default function LivePlayer({ deviceId }: { deviceId: string }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const micTrackRef = useRef<MediaStreamTrack | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const recStartRef = useRef(0)
+  const recMimeRef = useRef('video/webm')
+  const uploadedRef = useRef(false)
   const [status, setStatus] = useState('Verbinde mit der Kamera … (kann einige Sekunden dauern)')
   const [error, setError] = useState('')
   const [talking, setTalking] = useState(false)
   const [micReady, setMicReady] = useState(false)
   const [detect, setDetect] = useState(false)
+  const [recording, setRecording] = useState(false)
 
   useEffect(() => {
     const q = deviceId ? `?device=${encodeURIComponent(deviceId)}` : ''
+    const sep = q ? '&' : '?'
     let cancelled = false
     let keepAlive: ReturnType<typeof setInterval> | undefined
     let pc: RTCPeerConnection | undefined
+
+    chunksRef.current = []
+    uploadedRef.current = false
+    recorderRef.current = null
 
     const stopRemote = () => {
       const url = `/api/live/stop${q}`
       if (navigator.sendBeacon) navigator.sendBeacon(url)
       else fetch(url, { method: 'POST', keepalive: true }).catch(() => {})
+    }
+
+    // Record the live stream the whole time it's open, then save it as an event.
+    const startRecording = (stream: MediaStream) => {
+      if (recorderRef.current || cancelled || typeof MediaRecorder === 'undefined') return
+      const types = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+      const mime = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? ''
+      recMimeRef.current = mime || 'video/webm'
+      try {
+        const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+        rec.ondataavailable = (e) => {
+          if (e.data && e.data.size) chunksRef.current.push(e.data)
+        }
+        rec.start(1000) // 1s timeslice so we keep data even on an abrupt close
+        recorderRef.current = rec
+        recStartRef.current = Date.now()
+        setRecording(true)
+      } catch {
+        /* recording not supported on this stream — live still works */
+      }
+    }
+
+    // Upload whatever we've recorded so far (once). sendBeacon for page unload.
+    const finalizeUpload = (beacon: boolean) => {
+      if (uploadedRef.current) return
+      const rec = recorderRef.current
+      try {
+        if (rec && rec.state !== 'inactive') rec.stop()
+      } catch {
+        /* ignore */
+      }
+      if (chunksRef.current.length === 0) return
+      const blob = new Blob(chunksRef.current, { type: recMimeRef.current })
+      if (blob.size < 1024) return
+      uploadedRef.current = true
+      const secs = Math.max(1, Math.round((Date.now() - recStartRef.current) / 1000))
+      const url = `/api/live/record${q}${sep}seconds=${secs}`
+      if (beacon && navigator.sendBeacon) navigator.sendBeacon(url, blob)
+      else fetch(url, { method: 'POST', body: blob, keepalive: true }).catch(() => {})
+    }
+
+    const onPageHide = () => {
+      finalizeUpload(true)
+      stopRemote()
     }
 
     async function begin() {
@@ -57,6 +112,7 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
         if (videoRef.current && e.streams[0]) {
           videoRef.current.srcObject = e.streams[0]
           videoRef.current.play().catch(() => {})
+          startRecording(e.streams[0])
         }
       })
       pc.addEventListener('connectionstatechange', () => {
@@ -119,18 +175,19 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
     }
 
     void begin().catch((err) => setError(`Fehler: ${err?.message ?? err}`))
-    window.addEventListener('pagehide', stopRemote)
+    window.addEventListener('pagehide', onPageHide)
 
     return () => {
       cancelled = true
       if (keepAlive) clearInterval(keepAlive)
+      finalizeUpload(false) // save the recording before tearing the stream down
       try {
         pc?.getSenders().forEach((s) => s.track?.stop())
         pc?.close()
       } catch {
         /* ignore */
       }
-      window.removeEventListener('pagehide', stopRemote)
+      window.removeEventListener('pagehide', onPageHide)
       stopRemote()
     }
   }, [deviceId])
@@ -148,6 +205,7 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video ref={videoRef} controls autoPlay playsInline />
         <DetectionOverlay videoRef={videoRef} enabled={detect} />
+        {recording ? <span className="recDot">● Aufnahme</span> : null}
       </div>
       {status ? <p className="muted livenote">{status}</p> : null}
       {error ? <p className="liveerr">⚠ {error}</p> : null}
@@ -178,8 +236,9 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
       </div>
 
       <p className="muted livenote">
-        Live + Gegensprechen weckt die Akku-Kamera und verbraucht Akku — stoppt automatisch nach
-        kurzer Inaktivität.
+        Die Live-Ansicht wird automatisch aufgezeichnet und erscheint danach im Verlauf. Live +
+        Gegensprechen weckt die Akku-Kamera und verbraucht Akku — stoppt automatisch nach kurzer
+        Inaktivität.
       </p>
     </div>
   )
