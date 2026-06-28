@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { getEvent } from '@/lib/db'
 import { fmtTime, fmtColdStart, statusClass, labelText, labelClass } from '@/lib/format'
 import EventActions from './EventActions'
+import ClipPlayer from './ClipPlayer'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,10 +36,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
       <EventActions id={ev.id} clipPath={ev.clip_path} />
 
       {ev.clip_path ? (
-        <div className="player">
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video controls preload="metadata" poster={thumbUrl} src={`/api/media/${ev.clip_path}`} />
-        </div>
+        <ClipPlayer src={`/api/media/${ev.clip_path}`} poster={thumbUrl} />
       ) : (
         <div className="noclip">
           Kein Clip vorhanden (Status: <strong>{ev.recording_status}</strong>).
