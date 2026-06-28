@@ -5,6 +5,7 @@ import type { RingCamera } from 'ring-client-api'
 import type { Logger } from '../log'
 import type { LiveManager } from './liveManager'
 import type { WebRtcManager } from './webrtcManager'
+import type { SirenManager } from './sirenManager'
 import type { Repository } from '../db/repository'
 
 /** Best-effort unlink of a media file, constrained to mediaRoot. Missing files
@@ -49,12 +50,18 @@ function readBody(req: IncomingMessage, limit = 200_000): Promise<string> {
 export function startLiveServer(
   port: number,
   cameras: RingCamera[],
-  managers: { hls: LiveManager; webrtc: WebRtcManager; repo?: Repository; mediaRoot?: string },
+  managers: {
+    hls: LiveManager
+    webrtc: WebRtcManager
+    siren?: SirenManager
+    repo?: Repository
+    mediaRoot?: string
+  },
   log: Logger,
 ): void {
   const byId = new Map(cameras.map((c) => [String(c.id), c]))
   const fallback = cameras[0]
-  const { hls, webrtc, repo, mediaRoot } = managers
+  const { hls, webrtc, siren, repo, mediaRoot } = managers
 
   const server = createServer((req, res) => {
     const send = (code: number, body: unknown) => {
@@ -138,14 +145,18 @@ export function startLiveServer(
       const on = url.searchParams.get('on') !== 'false'
 
       switch (url.pathname) {
-        case '/device/siren':
+        case '/device/siren': {
           if (!camera.hasSiren) return send(409, { error: 'camera has no siren' })
-          log.info({ deviceId: id, on }, on ? '🚨 Siren ON' : '🔕 Siren OFF')
-          camera
-            .setSiren(on)
-            .then(() => send(200, { siren: on, deviceId: id }))
-            .catch(fail)
+          // on=true also doubles as the keepalive ping (start() is idempotent);
+          // the dead-man's switch / hard cap live in the SirenManager.
+          const action = siren
+            ? on
+              ? siren.start(camera)
+              : siren.stop(camera)
+            : camera.setSiren(on)
+          action.then(() => send(200, { siren: on, deviceId: id })).catch(fail)
           return
+        }
         case '/device/light':
           if (!camera.hasLight) return send(409, { error: 'camera has no light' })
           log.info({ deviceId: id, on }, on ? '💡 Light ON' : '💡 Light OFF')

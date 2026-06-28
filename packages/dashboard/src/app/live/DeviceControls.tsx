@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Caps {
   hasSiren: boolean
@@ -12,15 +12,31 @@ interface Caps {
  * reports what the physical device actually supports (camera.hasSiren /
  * hasLight); we only render a button when the hardware is there. A battery
  * Außenkamera that has neither shows an honest note instead of dead buttons.
+ *
+ * Siren safety (dead-man's switch): while the siren is on, this component pings
+ * the worker every few seconds. If the pings stop — tab closed, device
+ * unreachable — the worker auto-offs after a grace period (plus a hard cap).
+ * So the siren never wails forever, but stays on as long as you're watching.
  */
 export default function DeviceControls({ deviceId }: { deviceId: string }) {
   const q = deviceId ? `?device=${encodeURIComponent(deviceId)}` : ''
+  const sep = q ? '&' : '?'
   const [caps, setCaps] = useState<Caps | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [siren, setSiren] = useState(false)
   const [light, setLight] = useState(false)
   const [busy, setBusy] = useState<'' | 'siren' | 'light'>('')
   const [error, setError] = useState('')
+
+  const sirenPing = useRef<ReturnType<typeof setInterval> | null>(null)
+  const sirenOnRef = useRef(false)
+
+  const stopSirenPing = () => {
+    if (sirenPing.current) {
+      clearInterval(sirenPing.current)
+      sirenPing.current = null
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -39,20 +55,48 @@ export default function DeviceControls({ deviceId }: { deviceId: string }) {
     }
   }, [q])
 
+  // Turn the siren off if we leave the page while it's on (when reachable; if
+  // not, the worker's dead-man's switch handles it).
+  useEffect(() => {
+    const offBeacon = () => {
+      const url = `/api/device/siren${sep}on=false`
+      if (navigator.sendBeacon) navigator.sendBeacon(url)
+      else fetch(url, { method: 'POST', keepalive: true }).catch(() => {})
+    }
+    const onHide = () => {
+      if (sirenOnRef.current) offBeacon()
+    }
+    window.addEventListener('pagehide', onHide)
+    return () => {
+      window.removeEventListener('pagehide', onHide)
+      stopSirenPing()
+      if (sirenOnRef.current) offBeacon()
+    }
+  }, [sep])
+
   async function toggle(control: 'siren' | 'light', next: boolean) {
     setBusy(control)
     setError('')
     try {
-      const r = await fetch(`/api/device/${control}${q ? q + '&' : '?'}on=${next}`, {
-        method: 'POST',
-      })
+      const r = await fetch(`/api/device/${control}${sep}on=${next}`, { method: 'POST' })
       if (!r.ok) {
         const e = await r.json().catch(() => ({}))
         setError(e.error ? `Fehlgeschlagen: ${e.error}` : 'Befehl fehlgeschlagen.')
         return
       }
-      if (control === 'siren') setSiren(next)
-      else setLight(next)
+      if (control === 'siren') {
+        setSiren(next)
+        sirenOnRef.current = next
+        stopSirenPing()
+        if (next) {
+          // Keepalive ping: re-asserting on=true bumps the worker's dead-man timer.
+          sirenPing.current = setInterval(() => {
+            fetch(`/api/device/siren${sep}on=true`, { method: 'POST' }).catch(() => {})
+          }, 5000)
+        }
+      } else {
+        setLight(next)
+      }
     } catch {
       setError('Worker nicht erreichbar.')
     } finally {
@@ -91,6 +135,12 @@ export default function DeviceControls({ deviceId }: { deviceId: string }) {
         >
           {light ? '💡 Licht AUS' : '💡 Licht EIN'}
         </button>
+      ) : null}
+      {siren ? (
+        <span className="muted livenote sirenHint">
+          Sirene läuft — schaltet sich automatisch ab, wenn du die Seite verlässt (oder spätestens
+          nach 5&nbsp;Minuten).
+        </span>
       ) : null}
       {error ? <p className="liveerr">⚠ {error}</p> : null}
     </div>

@@ -7,6 +7,7 @@ import { Repository } from './db/repository'
 import { subscribeCamera } from './events/subscriber'
 import { LiveManager } from './live/liveManager'
 import { WebRtcManager } from './live/webrtcManager'
+import { SirenManager } from './live/sirenManager'
 import { startLiveServer } from './live/server'
 import type { RingApi, RingCamera } from 'ring-client-api'
 
@@ -33,12 +34,14 @@ async function main(): Promise<void> {
   let heartbeat: NodeJS.Timeout | undefined
   let live: LiveManager | undefined
   let webrtc: WebRtcManager | undefined
+  let siren: SirenManager | undefined
 
   const shutdown = (code: number): never => {
     if (heartbeat) clearInterval(heartbeat)
     try {
       live?.stopAll()
       void webrtc?.stopAll()
+      void siren?.stopAll()
     } catch {
       /* ignore */
     }
@@ -150,10 +153,15 @@ async function main(): Promise<void> {
       config.LIVE_IDLE_TIMEOUT_SECONDS * 1000,
       log,
     )
+    siren = new SirenManager(
+      config.SIREN_GRACE_SECONDS * 1000,
+      config.SIREN_MAX_SECONDS * 1000,
+      log,
+    )
     startLiveServer(
       config.LIVE_PORT,
       selected,
-      { hls: live, webrtc, repo, mediaRoot: config.DATA_MEDIA_DIR },
+      { hls: live, webrtc, siren, repo, mediaRoot: config.DATA_MEDIA_DIR },
       log,
     )
   }
