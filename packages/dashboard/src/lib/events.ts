@@ -8,8 +8,14 @@ const jsonHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'no-s
  * proxies the request. This never touches Ring's servers.
  */
 export async function proxyDeleteEvent(id: number): Promise<Response> {
+  return proxyDeleteEvents([id])
+}
+
+/** Delete several events at once (clip + thumbnail + DB row each, local only). */
+export async function proxyDeleteEvents(ids: number[]): Promise<Response> {
+  const list = ids.filter((n) => Number.isInteger(n) && n > 0).join(',')
   try {
-    const r = await fetch(`${WORKER_LIVE_URL}/events/delete?id=${encodeURIComponent(String(id))}`, {
+    const r = await fetch(`${WORKER_LIVE_URL}/events/delete?ids=${encodeURIComponent(list)}`, {
       method: 'POST',
     })
     return new Response(await r.text(), { status: r.status, headers: jsonHeaders })

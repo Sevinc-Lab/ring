@@ -1,26 +1,11 @@
 import { createServer, type IncomingMessage } from 'http'
-import { unlink } from 'fs/promises'
-import { resolve, sep } from 'path'
 import type { RingCamera } from 'ring-client-api'
 import type { Logger } from '../log'
 import type { LiveManager } from './liveManager'
 import type { WebRtcManager } from './webrtcManager'
 import type { SirenManager } from './sirenManager'
 import type { Repository } from '../db/repository'
-
-/** Best-effort unlink of a media file, constrained to mediaRoot. Missing files
- *  are fine (already gone). Returns true if the path was inside the root. */
-async function removeMediaFile(mediaRoot: string, rel: string | null): Promise<void> {
-  if (!rel) return
-  const root = resolve(mediaRoot)
-  const abs = resolve(root, rel)
-  if (abs !== root && !abs.startsWith(root + sep)) return // never escape the media root
-  try {
-    await unlink(abs)
-  } catch {
-    /* already gone — fine */
-  }
-}
+import { removeMediaFile } from '../mediaFs'
 
 function readBody(req: IncomingMessage, limit = 200_000): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -102,20 +87,26 @@ export function startLiveServer(
       // it only removes what we recorded on CasaOS.
       if (req.method === 'POST' && url.pathname === '/events/delete') {
         if (!repo || !mediaRoot) return send(503, { error: 'delete not available' })
-        const id = Number(url.searchParams.get('id'))
-        if (!Number.isInteger(id) || id <= 0) return send(400, { error: 'bad id' })
-        const ev = repo.getEventPaths(id)
-        if (!ev) return send(404, { error: 'event not found' })
-        Promise.all([
-          removeMediaFile(mediaRoot, ev.clip_path),
-          removeMediaFile(mediaRoot, ev.thumb_path),
-        ])
-          .then(() => {
-            const deleted = repo.deleteEvent(id)
-            log.info({ id, deleted }, '🗑 Deleted local event (clip+thumb+row) — Ring untouched')
-            send(200, { deleted, id })
-          })
-          .catch(fail)
+        const repoRef = repo
+        const rootRef = mediaRoot
+        // Accept ?id=<n> (single) or ?ids=1,2,3 (bulk).
+        const raw = url.searchParams.get('ids') ?? url.searchParams.get('id') ?? ''
+        const ids = [...new Set(raw.split(',').map((s) => Number(s.trim())))].filter(
+          (n) => Number.isInteger(n) && n > 0,
+        )
+        if (ids.length === 0) return send(400, { error: 'no valid id(s)' })
+        ;(async () => {
+          let deleted = 0
+          for (const id of ids) {
+            const ev = repoRef.getEventPaths(id)
+            if (!ev) continue
+            await removeMediaFile(rootRef, ev.clip_path)
+            await removeMediaFile(rootRef, ev.thumb_path)
+            if (repoRef.deleteEvent(id)) deleted++
+          }
+          log.info({ requested: ids.length, deleted }, '🗑 Deleted local events — Ring untouched')
+          send(200, { deleted, requested: ids.length })
+        })().catch(fail)
         return
       }
 

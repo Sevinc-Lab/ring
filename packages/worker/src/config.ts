@@ -46,6 +46,16 @@ const EnvSchema = z.object({
   // cap SIREN_MAX_SECONDS turns it off no matter what (forgotten tab guard).
   SIREN_GRACE_SECONDS: z.coerce.number().int().positive().max(120).default(15),
   SIREN_MAX_SECONDS: z.coerce.number().int().positive().max(1800).default(300),
+
+  // Retention sweep: auto-delete OLD, UNIMPORTANT events so the disk never
+  // fills. Events whose label is in RETENTION_KEEP_LABELS (a real detection) are
+  // never auto-deleted. Everything else older than RETENTION_DAYS is removed
+  // (clip + thumbnail + row), locally only — Ring is never touched. Disable with
+  // RETENTION_ENABLED=false.
+  RETENTION_ENABLED: boolFromEnv(true),
+  RETENTION_DAYS: z.coerce.number().int().positive().max(3650).default(30),
+  RETENTION_KEEP_LABELS: z.string().default('person,dog,cat,parcel'),
+  RETENTION_SWEEP_HOURS: z.coerce.number().int().positive().max(168).default(6),
 })
 
 export type Config = z.infer<typeof EnvSchema>
