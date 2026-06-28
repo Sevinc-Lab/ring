@@ -10,6 +10,7 @@ import {
 } from '@/lib/db'
 import { fmtTime, statusClass, labelText, labelClass } from '@/lib/format'
 import CameraSelect from './CameraSelect'
+import VerlaufList, { type VEvent } from './VerlaufList'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,20 @@ const FILTERS: { key: LabelFilter; text: string }[] = [
   { key: 'none', text: 'keine Person' },
   { key: 'unclassified', text: 'unklassifiziert' },
 ]
+
+function toView(e: EventRow): VEvent {
+  return {
+    id: e.id,
+    thumbUrl: e.thumb_path ? `/api/media/${e.thumb_path}` : null,
+    hasClip: !!e.clip_path,
+    time: fmtTime(e.started_at),
+    sub: (e.device_name ?? 'Kamera') + ' · ' + e.kind,
+    labelText: labelText(e.label),
+    labelClass: labelClass(e.label),
+    status: e.recording_status,
+    statusClass: statusClass(e.recording_status),
+  }
+}
 
 function load(page: number, label: LabelFilter, device: string) {
   try {
@@ -101,31 +116,7 @@ export default function VerlaufPage({
             : 'Warte auf den Worker / die SQLite-Datenbank unter DATA_DB_PATH.'}
         </p>
       ) : (
-        <div className="grid">
-          {events.map((e) => (
-            <Link key={e.id} href={`/event/${e.id}`} className="card">
-              <div className="thumb">
-                {e.thumb_path ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`/api/media/${e.thumb_path}`} alt="" loading="lazy" />
-                ) : (
-                  <div className="noThumb">kein Thumbnail</div>
-                )}
-                {e.clip_path ? <span className="play">▶</span> : null}
-              </div>
-              <div className="meta">
-                <span className="time">{fmtTime(e.started_at)}</span>
-                <span className="sub">{(e.device_name ?? 'Kamera') + ' · ' + e.kind}</span>
-                <span className="badges">
-                  <span className={`badge ${labelClass(e.label)}`}>{labelText(e.label)}</span>
-                  <span className={`badge ${statusClass(e.recording_status)}`}>
-                    {e.recording_status}
-                  </span>
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <VerlaufList events={events.map(toView)} />
       )}
 
       {pages > 1 ? (

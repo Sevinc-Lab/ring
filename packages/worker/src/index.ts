@@ -9,6 +9,7 @@ import { LiveManager } from './live/liveManager'
 import { WebRtcManager } from './live/webrtcManager'
 import { SirenManager } from './live/sirenManager'
 import { startLiveServer } from './live/server'
+import { startRetention } from './retention'
 import type { RingApi, RingCamera } from 'ring-client-api'
 
 const HEARTBEAT_INTERVAL_MS = 60_000
@@ -171,6 +172,22 @@ async function main(): Promise<void> {
     '✅ Listening for motion events. On motion: record a clip + first-frame thumbnail to SATA. ' +
       'If NO "MOTION event received" lines appear, see Troubleshooting in docs/SETUP.md.',
   )
+
+  // Retention: auto-delete old, unimportant events so the SATA disk never
+  // fills. Real detections (person/dog/cat/…) are kept forever. Local only.
+  if (config.RETENTION_ENABLED) {
+    startRetention(
+      repo,
+      config.DATA_MEDIA_DIR,
+      {
+        enabled: true,
+        days: config.RETENTION_DAYS,
+        keepLabels: config.RETENTION_KEEP_LABELS.split(','),
+        sweepHours: config.RETENTION_SWEEP_HOURS,
+      },
+      log,
+    )
+  }
 
   // Watchdog: the reverse-engineered Ring push connection can go stale over time
   // (events silently stop arriving). A periodic clean restart re-establishes it.

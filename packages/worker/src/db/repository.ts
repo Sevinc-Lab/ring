@@ -116,6 +116,30 @@ export class Repository {
       })
   }
 
+  /**
+   * Events older than `cutoffIso` whose label is NOT in `keepLabels` — the
+   * retention sweep's deletion candidates. Returns id + media paths so the
+   * caller can unlink the files too.
+   */
+  findExpiredEvents(
+    cutoffIso: string,
+    keepLabels: string[],
+  ): { id: number; clip_path: string | null; thumb_path: string | null }[] {
+    const placeholders = keepLabels.map(() => '?').join(',')
+    const notKept = keepLabels.length ? `AND label NOT IN (${placeholders})` : ''
+    return this.db
+      .prepare(
+        `SELECT id, clip_path, thumb_path FROM events
+         WHERE started_at < ? ${notKept}
+         ORDER BY id ASC`,
+      )
+      .all(cutoffIso, ...keepLabels) as {
+      id: number
+      clip_path: string | null
+      thumb_path: string | null
+    }[]
+  }
+
   /** Clip + thumb paths for one event (for local deletion), or undefined. */
   getEventPaths(id: number): { clip_path: string | null; thumb_path: string | null } | undefined {
     return this.db.prepare(`SELECT clip_path, thumb_path FROM events WHERE id = ?`).get(id) as
