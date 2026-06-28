@@ -42,6 +42,13 @@ const SELECT_COLS = `id, device_id, device_name, kind, started_at, recording_sta
 export const LABEL_FILTERS = ['all', 'person', 'dog', 'cat', 'car', 'none', 'unclassified'] as const
 export type LabelFilter = (typeof LABEL_FILTERS)[number]
 
+/**
+ * Detection classes that filter by "the clip CONTAINS this object" (object tag),
+ * not just by the single primary label — so a clip with a person AND a dog shows
+ * up under both 🧍 Person and 🐕 Hund. (`none`/`unclassified` stay label-based.)
+ */
+const CONTAINS_LABELS = new Set(['person', 'dog', 'cat', 'car'])
+
 export function normalizeLabel(raw: string | undefined): LabelFilter {
   return (LABEL_FILTERS as readonly string[]).includes(raw ?? '')
     ? (raw as LabelFilter)
@@ -56,8 +63,14 @@ function buildWhere(
   const cond: string[] = []
   const params: string[] = []
   if (label !== 'all') {
-    cond.push('label = ?')
-    params.push(label)
+    if (CONTAINS_LABELS.has(label)) {
+      // tag contains it, OR (older events without tags) the primary label is it.
+      cond.push('(objects LIKE ? OR label = ?)')
+      params.push(`%,${label},%`, label)
+    } else {
+      cond.push('label = ?')
+      params.push(label)
+    }
   }
   if (deviceId) {
     cond.push('device_id = ?')
