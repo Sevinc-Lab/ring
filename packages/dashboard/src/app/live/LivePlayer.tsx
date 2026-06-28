@@ -82,23 +82,46 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
       }
     }
 
-    // Upload whatever we've recorded so far (once). sendBeacon for page unload.
+    const uploadBlob = (blob: Blob, beacon: boolean) => {
+      if (blob.size < 1024) return
+      const secs = Math.max(1, Math.round((Date.now() - recStartRef.current) / 1000))
+      const url = `/api/live/record${q}${sep}seconds=${secs}`
+      // NOTE: sendBeacon / keepalive fetch cap the body at ~64 KB — useless for a
+      // multi-MB clip. So the normal path is a plain fetch (it completes during
+      // in-app navigation because the SPA context stays alive); the beacon is
+      // only a best-effort attempt for a hard tab close.
+      if (beacon && navigator.sendBeacon) navigator.sendBeacon(url, blob)
+      else fetch(url, { method: 'POST', body: blob }).catch(() => {})
+    }
+
+    // Save the recording (once). On a clean stop we wait for the final chunk via
+    // onstop; for a page unload we grab whatever we have right now.
     const finalizeUpload = (beacon: boolean) => {
       if (uploadedRef.current) return
+      uploadedRef.current = true
       const rec = recorderRef.current
+      const mime = recMimeRef.current
+      if (!beacon && rec && rec.state !== 'inactive') {
+        rec.onstop = () => uploadBlob(new Blob(chunksRef.current, { type: mime }), false)
+        try {
+          rec.stop()
+        } catch {
+          uploadBlob(new Blob(chunksRef.current, { type: mime }), false)
+        }
+        return
+      }
+      // Page unload (or recorder already stopped): use what we've buffered.
+      try {
+        if (rec && rec.state !== 'inactive') rec.requestData()
+      } catch {
+        /* ignore */
+      }
+      uploadBlob(new Blob(chunksRef.current, { type: mime }), beacon)
       try {
         if (rec && rec.state !== 'inactive') rec.stop()
       } catch {
         /* ignore */
       }
-      if (chunksRef.current.length === 0) return
-      const blob = new Blob(chunksRef.current, { type: recMimeRef.current })
-      if (blob.size < 1024) return
-      uploadedRef.current = true
-      const secs = Math.max(1, Math.round((Date.now() - recStartRef.current) / 1000))
-      const url = `/api/live/record${q}${sep}seconds=${secs}`
-      if (beacon && navigator.sendBeacon) navigator.sendBeacon(url, blob)
-      else fetch(url, { method: 'POST', body: blob, keepalive: true }).catch(() => {})
     }
 
     const onPageHide = () => {
@@ -119,6 +142,11 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
         if (!pc) return
         if (pc.connectionState === 'connected') setStatus('')
         else if (pc.connectionState === 'failed') setError('WebRTC-Verbindung fehlgeschlagen.')
+        // Stream ended (e.g. worker auto-stop) while still on the page → save now.
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+          setRecording(false)
+          finalizeUpload(false)
+        }
       })
 
       // Microphone (for talk). Without it we still watch, just listen-only.
