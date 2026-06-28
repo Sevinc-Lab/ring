@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import DetectionOverlay from './DetectionOverlay'
 
 /** Resolve once ICE gathering finishes (non-trickle) or after a timeout. */
 function waitIceComplete(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
@@ -36,6 +37,7 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
   const [error, setError] = useState('')
   const [talking, setTalking] = useState(false)
   const [micReady, setMicReady] = useState(false)
+  const [detect, setDetect] = useState(false)
 
   useEffect(() => {
     const q = deviceId ? `?device=${encodeURIComponent(deviceId)}` : ''
@@ -145,9 +147,20 @@ export default function LivePlayer({ deviceId }: { deviceId: string }) {
       <div className="player">
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video ref={videoRef} controls autoPlay playsInline />
+        <DetectionOverlay videoRef={videoRef} enabled={detect} />
       </div>
       {status ? <p className="muted livenote">{status}</p> : null}
       {error ? <p className="liveerr">⚠ {error}</p> : null}
+
+      <div className="talkRow">
+        <button
+          type="button"
+          className={`talkBtn${detect ? ' on' : ''}`}
+          onClick={() => setDetect((d) => !d)}
+        >
+          {detect ? '🔲 Objekt-Erkennung AUS' : '🔲 Objekte erkennen (KI)'}
+        </button>
+      </div>
 
       <div className="talkRow">
         <button
