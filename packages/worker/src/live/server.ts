@@ -66,6 +66,10 @@ export function startLiveServer(
           hasSiren: camera.hasSiren,
           hasLight: camera.hasLight,
           hasBattery: camera.hasBattery,
+          // Last known battery from cached device data — no wake / no drain.
+          batteryLevel: camera.batteryLevel,
+          hasLowBattery: camera.hasLowBattery,
+          operatingOnBattery: camera.operatingOnBattery,
         })
       }
 
