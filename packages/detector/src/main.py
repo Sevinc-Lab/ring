@@ -20,7 +20,7 @@ from detect import Detector, resolve_class_ids
 from frames import sample_frames
 from notify import build_payload, maybe_notify
 
-ENGINE = "yolov8n-onnx"
+ENGINE = "yolov8-onnx"
 log = logging.getLogger("detector")
 
 
