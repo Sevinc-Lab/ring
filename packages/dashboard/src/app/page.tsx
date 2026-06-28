@@ -3,10 +3,12 @@ import {
   listEvents,
   countEvents,
   normalizeLabel,
+  getLatestDeviceId,
   type EventRow,
   type LabelFilter,
 } from '@/lib/db'
 import { fmtTime, statusClass, labelText, labelClass } from '@/lib/format'
+import BatteryBadge from './BatteryBadge'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,6 +46,13 @@ export default function Home({
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const qs = (p: number) => `/?label=${label}&page=${p}`
 
+  let deviceId = ''
+  try {
+    deviceId = getLatestDeviceId() ?? ''
+  } catch {
+    deviceId = ''
+  }
+
   return (
     <div className="wrap">
       <div className="topbar">
@@ -51,6 +60,7 @@ export default function Home({
         <span className="count">
           {ok ? `${total} Event${total === 1 ? '' : 's'}` : 'Datenbank noch nicht verfügbar'}
         </span>
+        <BatteryBadge deviceId={deviceId} />
         <Link href="/live" className="liveBtn">
           🔴 Live
         </Link>
