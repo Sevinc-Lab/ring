@@ -88,7 +88,17 @@ async function main(): Promise<void> {
   }
 
   for (const cam of cameras) {
-    log.info({ id: cam.id, name: cam.name, deviceType: cam.deviceType }, 'Discovered camera')
+    log.info(
+      {
+        id: cam.id,
+        name: cam.name,
+        deviceType: cam.deviceType,
+        hasSiren: cam.hasSiren,
+        hasLight: cam.hasLight,
+        hasBattery: cam.hasBattery,
+      },
+      'Discovered camera',
+    )
   }
 
   const needles = parseDeviceFilter(config.DEVICE_FILTER)

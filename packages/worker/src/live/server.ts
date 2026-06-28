@@ -17,13 +17,16 @@ function readBody(req: IncomingMessage, limit = 200_000): Promise<string> {
 }
 
 /**
- * Live control plane, reachable from the dashboard over the compose network
- * (http://ring-worker:<port>); not published to the host.
+ * Live + device control plane, reachable from the dashboard over the compose
+ * network (http://ring-worker:<port>); not published to the host.
  *
  *   POST /live/webrtc?device=<id>   body=offer SDP  -> { sdp: answer }   (two-way)
  *   POST /live/keepalive?device=<id>                -> 200
  *   POST /live/start?device=<id>                    -> { path }          (HLS fallback)
  *   POST /live/stop?device=<id>                     -> 200
+ *   GET  /device/caps?device=<id>                   -> { hasSiren, hasLight, ... }
+ *   POST /device/siren?device=<id>&on=<bool>        -> { siren }
+ *   POST /device/light?device=<id>&on=<bool>        -> { light }
  */
 export function startLiveServer(
   port: number,
@@ -50,10 +53,44 @@ export function startLiveServer(
       const camera = byId.get(device) ?? fallback
       const id = camera ? String(camera.id) : ''
 
-      if (req.method !== 'POST') return send(404, { error: 'not found' })
       if (!camera) return send(404, { error: 'no camera' })
 
+      // Capability probe — what this physical camera actually supports. The
+      // dashboard gates its buttons on this, so a model without a siren/light
+      // (e.g. the battery Außenkamera) honestly shows nothing instead of a
+      // dead button. GET so it can be fetched cheaply on mount.
+      if (req.method === 'GET' && url.pathname === '/device/caps') {
+        return send(200, {
+          deviceId: id,
+          name: camera.name,
+          hasSiren: camera.hasSiren,
+          hasLight: camera.hasLight,
+          hasBattery: camera.hasBattery,
+        })
+      }
+
+      if (req.method !== 'POST') return send(404, { error: 'not found' })
+
+      // on=<bool>: default true (turning a control on is the common case).
+      const on = url.searchParams.get('on') !== 'false'
+
       switch (url.pathname) {
+        case '/device/siren':
+          if (!camera.hasSiren) return send(409, { error: 'camera has no siren' })
+          log.info({ deviceId: id, on }, on ? '🚨 Siren ON' : '🔕 Siren OFF')
+          camera
+            .setSiren(on)
+            .then(() => send(200, { siren: on, deviceId: id }))
+            .catch(fail)
+          return
+        case '/device/light':
+          if (!camera.hasLight) return send(409, { error: 'camera has no light' })
+          log.info({ deviceId: id, on }, on ? '💡 Light ON' : '💡 Light OFF')
+          camera
+            .setLight(on)
+            .then(() => send(200, { light: on, deviceId: id }))
+            .catch(fail)
+          return
         case '/live/webrtc':
           readBody(req)
             .then((offer) => webrtc.negotiate(camera, offer))
