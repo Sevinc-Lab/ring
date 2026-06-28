@@ -53,6 +53,25 @@ export function startLiveServer(
       const camera = byId.get(device) ?? fallback
       const id = camera ? String(camera.id) : ''
 
+      // Full camera list for the dashboard overview — name + capabilities +
+      // last known battery, all from cached device data (no wake / no drain).
+      if (req.method === 'GET' && url.pathname === '/devices') {
+        return send(
+          200,
+          cameras.map((c) => ({
+            deviceId: String(c.id),
+            name: c.name,
+            deviceType: c.deviceType,
+            hasSiren: c.hasSiren,
+            hasLight: c.hasLight,
+            hasBattery: c.hasBattery,
+            batteryLevel: c.batteryLevel,
+            hasLowBattery: c.hasLowBattery,
+            operatingOnBattery: c.operatingOnBattery,
+          })),
+        )
+      }
+
       if (!camera) return send(404, { error: 'no camera' })
 
       // Capability probe — what this physical camera actually supports. The

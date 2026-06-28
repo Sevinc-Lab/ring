@@ -1,128 +1,141 @@
 import Link from 'next/link'
-import {
-  listEvents,
-  countEvents,
-  normalizeLabel,
-  getLatestDeviceId,
-  type EventRow,
-  type LabelFilter,
-} from '@/lib/db'
-import { fmtTime, statusClass, labelText, labelClass } from '@/lib/format'
-import BatteryBadge from './BatteryBadge'
+import { listDevices, type DeviceRow } from '@/lib/db'
+import { getWorkerDevices, type WorkerDevice } from '@/lib/device'
+import { fmtTime } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
-const PAGE_SIZE = 60
-
-const FILTERS: { key: LabelFilter; text: string }[] = [
-  { key: 'all', text: 'Alle' },
-  { key: 'person', text: '🧍 Person' },
-  { key: 'dog', text: '🐕 Hund' },
-  { key: 'cat', text: '🐈 Katze' },
-  { key: 'none', text: 'keine Person' },
-  { key: 'unclassified', text: 'unklassifiziert' },
-]
-
-function load(page: number, label: LabelFilter) {
-  try {
-    const total = countEvents(label)
-    const counts: Record<string, number> = {}
-    for (const f of FILTERS) counts[f.key] = f.key === label ? total : countEvents(f.key)
-    const events = listEvents(PAGE_SIZE, (page - 1) * PAGE_SIZE, label)
-    return { events, total, counts, ok: true }
-  } catch {
-    return { events: [] as EventRow[], total: 0, counts: {} as Record<string, number>, ok: false }
-  }
+interface CameraTile {
+  deviceId: string
+  name: string
+  hasBattery: boolean
+  batteryLevel: number | null
+  hasLowBattery: boolean
+  operatingOnBattery: boolean | null
+  online: boolean
+  lastThumb: string | null
+  lastEventAt: string | null
+  lastEventId: number | null
+  eventCount: number
 }
 
-export default function Home({
-  searchParams,
-}: {
-  searchParams: { page?: string; label?: string }
-}) {
-  const label = normalizeLabel(searchParams.label)
-  const page = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
-  const { events, total, counts, ok } = load(page, label)
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const qs = (p: number) => `/?label=${label}&page=${p}`
+function battery(level: number, low: boolean, onBattery: boolean | null) {
+  const lvl = Math.max(0, Math.min(100, Math.round(level)))
+  const isLow = low || lvl <= 20
+  const cls = isLow ? 'low' : lvl <= 40 ? 'mid' : 'ok'
+  const icon = onBattery === false ? '🔌' : isLow ? '🪫' : '🔋'
+  return { lvl, cls, icon }
+}
 
-  let deviceId = ''
-  try {
-    deviceId = getLatestDeviceId() ?? ''
-  } catch {
-    deviceId = ''
+/** Merge the worker's live camera list (caps + battery) with the DB index
+ *  (last snapshot + counts). Worker is the spine when reachable; otherwise we
+ *  fall back to whatever cameras the index has seen. */
+function buildTiles(worker: WorkerDevice[] | null, db: DeviceRow[]): CameraTile[] {
+  const dbById = new Map(db.map((d) => [d.device_id, d]))
+  const fromWorker = (w: WorkerDevice): CameraTile => {
+    const d = dbById.get(w.deviceId)
+    return {
+      deviceId: w.deviceId,
+      name: w.name || d?.device_name || 'Kamera',
+      hasBattery: !!w.hasBattery,
+      batteryLevel: w.batteryLevel ?? null,
+      hasLowBattery: !!w.hasLowBattery,
+      operatingOnBattery: w.operatingOnBattery ?? null,
+      online: true,
+      lastThumb: d?.last_thumb_path ?? null,
+      lastEventAt: d?.last_event_at ?? null,
+      lastEventId: d?.last_event_id ?? null,
+      eventCount: d?.event_count ?? 0,
+    }
   }
+  if (worker && worker.length) return worker.map(fromWorker)
+  return db.map((d) => ({
+    deviceId: d.device_id,
+    name: d.device_name ?? 'Kamera',
+    hasBattery: false,
+    batteryLevel: null,
+    hasLowBattery: false,
+    operatingOnBattery: null,
+    online: false,
+    lastThumb: d.last_thumb_path,
+    lastEventAt: d.last_event_at,
+    lastEventId: d.last_event_id,
+    eventCount: d.event_count,
+  }))
+}
+
+export default async function DashboardPage() {
+  let dbDevices: DeviceRow[] = []
+  let dbOk = true
+  try {
+    dbDevices = listDevices()
+  } catch {
+    dbOk = false
+  }
+  const workerDevices = await getWorkerDevices()
+  const tiles = buildTiles(workerDevices, dbDevices)
 
   return (
     <div className="wrap">
       <div className="topbar">
-        <h1>Ring NVR</h1>
+        <h1>Dashboard</h1>
         <span className="count">
-          {ok ? `${total} Event${total === 1 ? '' : 's'}` : 'Datenbank noch nicht verfügbar'}
+          {tiles.length} Kamera{tiles.length === 1 ? '' : 's'}
         </span>
-        <BatteryBadge deviceId={deviceId} />
-        <Link href="/live" className="liveBtn">
-          🔴 Live
-        </Link>
       </div>
 
-      {ok ? (
-        <nav className="filters">
-          {FILTERS.map((f) => (
-            <Link
-              key={f.key}
-              href={`/?label=${f.key}`}
-              className={`chip${f.key === label ? ' active' : ''}`}
-            >
-              {f.text}
-              {counts[f.key] != null ? <span className="n">{counts[f.key]}</span> : null}
-            </Link>
-          ))}
-        </nav>
-      ) : null}
-
-      {events.length === 0 ? (
+      {tiles.length === 0 ? (
         <p className="empty">
-          {ok
-            ? 'Keine Events für diesen Filter.'
+          {dbOk
+            ? 'Noch keine Kamera gesehen. Sobald der Worker verbunden ist und ein Event eintrifft, erscheint sie hier.'
             : 'Warte auf den Worker / die SQLite-Datenbank unter DATA_DB_PATH.'}
         </p>
       ) : (
-        <div className="grid">
-          {events.map((e) => (
-            <Link key={e.id} href={`/event/${e.id}`} className="card">
-              <div className="thumb">
-                {e.thumb_path ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`/api/media/${e.thumb_path}`} alt="" loading="lazy" />
-                ) : (
-                  <div className="noThumb">kein Thumbnail</div>
-                )}
-                {e.clip_path ? <span className="play">▶</span> : null}
-              </div>
-              <div className="meta">
-                <span className="time">{fmtTime(e.started_at)}</span>
-                <span className="sub">{(e.device_name ?? 'Kamera') + ' · ' + e.kind}</span>
-                <span className="badges">
-                  <span className={`badge ${labelClass(e.label)}`}>{labelText(e.label)}</span>
-                  <span className={`badge ${statusClass(e.recording_status)}`}>
-                    {e.recording_status}
+        <div className="camGrid">
+          {tiles.map((c) => {
+            const b = c.hasBattery && c.batteryLevel != null
+              ? battery(c.batteryLevel, c.hasLowBattery, c.operatingOnBattery)
+              : null
+            return (
+              <div key={c.deviceId} className="camCard">
+                <Link href={`/live?device=${encodeURIComponent(c.deviceId)}`} className="camThumb">
+                  {c.lastThumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/api/media/${c.lastThumb}`} alt="" loading="lazy" />
+                  ) : (
+                    <div className="noThumb">kein Bild</div>
+                  )}
+                  <span className="liveTag">🔴 Live</span>
+                </Link>
+                <div className="camMeta">
+                  <span className="camName">{c.name}</span>
+                  <span className="camRow">
+                    {b ? (
+                      <span className={`battery ${b.cls}`} title={`Akku: ${b.lvl}%`}>
+                        {b.icon} {b.lvl}%
+                      </span>
+                    ) : null}
+                    {c.eventCount > 0 ? (
+                      <Link href="/verlauf" className="camEvents">
+                        {c.eventCount} Event{c.eventCount === 1 ? '' : 's'}
+                      </Link>
+                    ) : null}
                   </span>
-                </span>
+                  <span className="camLast">
+                    {c.lastEventAt ? `Zuletzt: ${fmtTime(c.lastEventAt)}` : 'Noch kein Event'}
+                  </span>
+                </div>
               </div>
-            </Link>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {pages > 1 ? (
-        <nav className="pager">
-          {page > 1 ? <Link href={qs(page - 1)}>← Neuer</Link> : <span className="disabled">← Neuer</span>}
-          <span>
-            Seite {page} / {pages}
-          </span>
-          {page < pages ? <Link href={qs(page + 1)}>Älter →</Link> : <span className="disabled">Älter →</span>}
-        </nav>
+      {workerDevices === null ? (
+        <p className="muted dashnote">
+          Worker nicht erreichbar — zeige zwischengespeicherte Kameras aus dem Verlauf. Akkustand und
+          Live brauchen den laufenden Worker.
+        </p>
       ) : null}
     </div>
   )

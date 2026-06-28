@@ -21,8 +21,8 @@ export default function EventPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="wrap detail">
-      <Link href="/" className="back">
-        ← Timeline
+      <Link href="/verlauf" className="back">
+        ← Verlauf
       </Link>
 
       <h1>

@@ -74,6 +74,40 @@ export function getLatestDeviceId(): string | null {
   return row?.device_id ?? null
 }
 
+export interface DeviceRow {
+  device_id: string
+  device_name: string | null
+  last_event_at: string | null
+  last_thumb_path: string | null
+  last_event_id: number | null
+  event_count: number
+}
+
+/**
+ * One row per camera seen in the index, newest activity first. Each carries its
+ * most recent event (for a static snapshot tile) and total event count. Used by
+ * the Dashboard overview as the battery-safe source of camera tiles — and as a
+ * fallback list when the worker's /devices endpoint is unreachable.
+ */
+export function listDevices(): DeviceRow[] {
+  return db()
+    .prepare(
+      `SELECT e.device_id        AS device_id,
+              e.device_name      AS device_name,
+              e.started_at       AS last_event_at,
+              e.thumb_path       AS last_thumb_path,
+              e.id               AS last_event_id,
+              c.n                AS event_count
+       FROM events e
+       JOIN (
+         SELECT device_id, MAX(id) AS max_id, COUNT(*) AS n
+         FROM events GROUP BY device_id
+       ) c ON c.max_id = e.id
+       ORDER BY e.started_at DESC, e.id DESC`,
+    )
+    .all() as DeviceRow[]
+}
+
 export function countEvents(label: LabelFilter = 'all'): number {
   const w = labelWhere(label)
   const row = db().prepare(`SELECT COUNT(*) AS n FROM events ${w.sql}`).get(...w.params) as {

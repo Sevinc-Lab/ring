@@ -6,12 +6,19 @@ import BatteryBadge from '../BatteryBadge'
 
 export const dynamic = 'force-dynamic'
 
-export default function LivePage() {
-  let deviceId = ''
-  try {
-    deviceId = getLatestDeviceId() ?? ''
-  } catch {
-    deviceId = ''
+export default function LivePage({
+  searchParams,
+}: {
+  searchParams: { device?: string }
+}) {
+  // Prefer the camera picked on the Dashboard; fall back to the most recent one.
+  let deviceId = searchParams.device ?? ''
+  if (!deviceId) {
+    try {
+      deviceId = getLatestDeviceId() ?? ''
+    } catch {
+      deviceId = ''
+    }
   }
   return (
     <div className="wrap">
@@ -19,7 +26,7 @@ export default function LivePage() {
         <h1>🔴 Live</h1>
         <BatteryBadge deviceId={deviceId} />
         <Link href="/" className="back">
-          ← Timeline
+          ← Dashboard
         </Link>
       </div>
       <LivePlayer deviceId={deviceId} />
