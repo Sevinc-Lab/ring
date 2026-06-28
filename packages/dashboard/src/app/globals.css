@@ -50,6 +50,35 @@ a {
   color: var(--muted);
   font-size: 13px;
 }
+.topbar .liveBtn {
+  margin-left: auto;
+  padding: 5px 12px;
+  border: 1px solid #6e2620;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fail);
+}
+.topbar .liveBtn:hover {
+  background: #1f1416;
+  border-color: var(--fail);
+}
+
+.liveWrap {
+  max-width: 960px;
+}
+.livenote {
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+.liveerr {
+  color: var(--fail);
+  font-size: 14px;
+  margin: 12px 0;
+}
+.muted {
+  color: var(--muted);
+}
 
 .filters {
   display: flex;

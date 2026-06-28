@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { createReadStream, statSync } from 'fs'
 import type { ReadStream } from 'fs'
-import { resolveMediaPath, mimeFor } from '@/lib/media'
+import { resolveMediaPath, mimeFor, isLivePath } from '@/lib/media'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
   const baseHeaders: Record<string, string> = {
     'Content-Type': mimeFor(abs),
     'Accept-Ranges': 'bytes',
-    'Cache-Control': 'private, max-age=60',
+    'Cache-Control': isLivePath(params.path) ? 'no-store' : 'private, max-age=60',
   }
 
   const range = req.headers.get('range')

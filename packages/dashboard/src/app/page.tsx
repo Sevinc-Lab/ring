@@ -51,6 +51,9 @@ export default function Home({
         <span className="count">
           {ok ? `${total} Event${total === 1 ? '' : 's'}` : 'Datenbank noch nicht verfügbar'}
         </span>
+        <Link href="/live" className="liveBtn">
+          🔴 Live
+        </Link>
       </div>
 
       {ok ? (
