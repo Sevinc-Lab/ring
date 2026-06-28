@@ -564,6 +564,30 @@ dl.facts dd {
   color: var(--text);
 }
 
+/* object filter row + tags */
+.objRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.objRow .camSelect {
+  margin-left: 0;
+}
+.objTags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.objTag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #2f3744;
+  color: var(--muted);
+}
+
 /* event detail actions (download / delete) */
 .eventActions {
   display: flex;

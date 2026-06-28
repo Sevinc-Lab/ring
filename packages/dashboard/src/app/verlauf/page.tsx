@@ -3,6 +3,7 @@ import {
   listEvents,
   countEvents,
   listDevices,
+  listObjectTags,
   normalizeLabel,
   type EventRow,
   type DeviceRow,
@@ -10,6 +11,7 @@ import {
 } from '@/lib/db'
 import { fmtTime, statusClass, labelText, labelClass } from '@/lib/format'
 import CameraSelect from './CameraSelect'
+import ObjectSelect from './ObjectSelect'
 import VerlaufList, { type VEvent } from './VerlaufList'
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +23,7 @@ const FILTERS: { key: LabelFilter; text: string }[] = [
   { key: 'person', text: '🧍 Person' },
   { key: 'dog', text: '🐕 Hund' },
   { key: 'cat', text: '🐈 Katze' },
+  { key: 'car', text: '🚗 Auto' },
   { key: 'none', text: 'keine Person' },
   { key: 'unclassified', text: 'unklassifiziert' },
 ]
@@ -39,26 +42,31 @@ function toView(e: EventRow): VEvent {
   }
 }
 
-function load(page: number, label: LabelFilter, device: string) {
+function load(page: number, label: LabelFilter, device: string, object: string) {
   try {
     const dev = device || undefined
-    const total = countEvents(label, dev)
+    const obj = object || undefined
+    const total = countEvents(label, dev, obj)
     const counts: Record<string, number> = {}
-    for (const f of FILTERS) counts[f.key] = f.key === label ? total : countEvents(f.key, dev)
-    const events = listEvents(PAGE_SIZE, (page - 1) * PAGE_SIZE, label, dev)
+    for (const f of FILTERS) counts[f.key] = f.key === label ? total : countEvents(f.key, dev, obj)
+    const events = listEvents(PAGE_SIZE, (page - 1) * PAGE_SIZE, label, dev, obj)
     let cams: DeviceRow[] = []
+    let tags: string[] = []
     try {
       cams = listDevices()
+      tags = listObjectTags()
     } catch {
       cams = []
+      tags = []
     }
-    return { events, total, counts, cams, ok: true }
+    return { events, total, counts, cams, tags, ok: true }
   } catch {
     return {
       events: [] as EventRow[],
       total: 0,
       counts: {} as Record<string, number>,
       cams: [] as DeviceRow[],
+      tags: [] as string[],
       ok: false,
     }
   }
@@ -67,15 +75,18 @@ function load(page: number, label: LabelFilter, device: string) {
 export default function VerlaufPage({
   searchParams,
 }: {
-  searchParams: { page?: string; label?: string; device?: string }
+  searchParams: { page?: string; label?: string; device?: string; object?: string }
 }) {
   const label = normalizeLabel(searchParams.label)
   const device = searchParams.device ?? ''
+  const object = searchParams.object ?? ''
   const page = Math.max(1, Number.parseInt(searchParams.page ?? '1', 10) || 1)
-  const { events, total, counts, cams, ok } = load(page, label, device)
+  const { events, total, counts, cams, tags, ok } = load(page, label, device, object)
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  // Preserve the camera filter across label-chips and pagination links.
-  const dq = device ? `&device=${encodeURIComponent(device)}` : ''
+  // Preserve the camera + object filters across label-chips and pagination links.
+  const dq =
+    (device ? `&device=${encodeURIComponent(device)}` : '') +
+    (object ? `&object=${encodeURIComponent(object)}` : '')
   const qs = (p: number) => `/verlauf?label=${label}${dq}&page=${p}`
 
   return (
@@ -93,6 +104,13 @@ export default function VerlaufPage({
           />
         ) : null}
       </div>
+
+      {ok && tags.length ? (
+        <div className="objRow">
+          <ObjectSelect objects={tags} selected={object} label={label} device={device} />
+          {object ? <span className="muted">gefiltert nach Objekt: {object}</span> : null}
+        </div>
+      ) : null}
 
       {ok ? (
         <nav className="filters">

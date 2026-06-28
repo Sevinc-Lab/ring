@@ -25,11 +25,14 @@ class Config:
     poll_seconds: int = field(default_factory=lambda: _int("POLL_SECONDS", 5))
     frames_per_clip: int = field(default_factory=lambda: _int("FRAMES_PER_CLIP", 5))  # KORREKTUR M4-2
     min_confidence: float = field(default_factory=lambda: _float("MIN_CONFIDENCE", 0.40))
-    # Order matters: it is the label priority (first match wins on mixed scenes).
+    # The detector now detects ALL COCO classes; every detected class is stored
+    # as a filterable object tag. DETECT_CLASSES is only the PRIMARY-LABEL
+    # priority (first match wins on mixed scenes), e.g. a person holding a laptop
+    # is labeled 'person' but still tagged 'laptop' for filtering.
     detect_classes: list = field(
         default_factory=lambda: [
             c.strip()
-            for c in os.environ.get("DETECT_CLASSES", "person,dog,cat").split(",")
+            for c in os.environ.get("DETECT_CLASSES", "person,dog,cat,car").split(",")
             if c.strip()
         ]
     )

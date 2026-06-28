@@ -45,6 +45,8 @@ export function labelText(label: string): string {
       return '🐕 Hund'
     case 'cat':
       return '🐈 Katze'
+    case 'car':
+      return '🚗 Auto'
     case 'unclassified':
       return 'unklassifiziert'
     case 'error':
@@ -65,6 +67,8 @@ export function labelClass(label: string): string {
     case 'dog':
     case 'cat':
       return 'animal'
+    case 'car':
+      return 'person'
     case 'error':
       return 'fail'
     case 'none':

@@ -14,6 +14,13 @@ def connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, timeout=10)
     conn.execute("PRAGMA busy_timeout = 5000")
     conn.row_factory = sqlite3.Row
+    # Filterable object tags column. The worker also ensures it on boot; this is
+    # a defensive idempotent migration in case the detector connects first.
+    try:
+        conn.execute("ALTER TABLE events ADD COLUMN objects TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # column already exists (or table not created yet — worker owns it)
     return conn
 
 
@@ -31,9 +38,15 @@ def fetch_unclassified(conn: sqlite3.Connection, limit: int = 10) -> list[dict]:
     return [dict(r) for r in cur.fetchall()]
 
 
-def update_label(conn: sqlite3.Connection, event_id: int, label: str, label_meta: dict) -> None:
+def update_label(
+    conn: sqlite3.Connection,
+    event_id: int,
+    label: str,
+    label_meta: dict,
+    objects: str | None = None,
+) -> None:
     conn.execute(
-        "UPDATE events SET label = ?, label_meta = ? WHERE id = ?",
-        (label, json.dumps(label_meta, separators=(",", ":")), event_id),
+        "UPDATE events SET label = ?, label_meta = ?, objects = ? WHERE id = ?",
+        (label, json.dumps(label_meta, separators=(",", ":")), objects, event_id),
     )
     conn.commit()

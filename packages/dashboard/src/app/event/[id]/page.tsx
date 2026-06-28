@@ -19,6 +19,7 @@ export default function EventPage({ params }: { params: { id: string } }) {
   if (!ev) notFound()
 
   const thumbUrl = ev.thumb_path ? `/api/media/${ev.thumb_path}` : undefined
+  const objects = (ev.objects ?? '').split(',').filter(Boolean)
 
   return (
     <div className="wrap detail">
@@ -58,6 +59,20 @@ export default function EventPage({ params }: { params: { id: string } }) {
         <dt>Label</dt>
         <dd>
           <span className={`badge ${labelClass(ev.label)}`}>{labelText(ev.label)}</span>
+        </dd>
+        <dt>Erkannt</dt>
+        <dd>
+          {objects.length ? (
+            <span className="objTags">
+              {objects.map((o) => (
+                <span key={o} className="objTag">
+                  {o}
+                </span>
+              ))}
+            </span>
+          ) : (
+            '–'
+          )}
         </dd>
         <dt>Clip-Länge</dt>
         <dd>{ev.clip_seconds != null ? `${ev.clip_seconds} s` : '–'}</dd>

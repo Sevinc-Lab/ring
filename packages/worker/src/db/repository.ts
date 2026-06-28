@@ -59,7 +59,16 @@ export class Repository {
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('busy_timeout = 5000')
     this.db.exec(SCHEMA_SQL)
+    this.migrate()
     log.info({ dbPath }, 'SQLite ready')
+  }
+
+  /** Idempotent column migrations for DBs created before a column existed. */
+  private migrate(): void {
+    const cols = this.db.prepare(`PRAGMA table_info(events)`).all() as { name: string }[]
+    if (!cols.some((c) => c.name === 'objects')) {
+      this.db.exec(`ALTER TABLE events ADD COLUMN objects TEXT`)
+    }
   }
 
   /**
