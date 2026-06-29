@@ -48,12 +48,22 @@ def _webhook_for(cfg, label: str) -> str:
     return specific or cfg.n8n_webhook_url
 
 
+def _ntfy_priority(label: str) -> str:
+    """Per-label ntfy priority (NTFY_PRIORITY_<LABEL>) or the default 'urgent'.
+
+    The Android app maps the *sound* to the priority channel, not the topic — so
+    giving person/cat a different priority than the doorbell ('urgent'/5) puts
+    them on a different channel where you can pick a different ringtone.
+    """
+    return os.environ.get(f"NTFY_PRIORITY_{label.upper()}", "").strip() or "urgent"
+
+
 def _notify_ntfy(cfg, payload: dict, label: str) -> None:
     """Loud ntfy alarm with the detection image (header values stay ASCII; the
     UTF-8 message goes in the body)."""
     if not getattr(cfg, "ntfy_url", "") or label not in getattr(cfg, "ntfy_labels", []):
         return
-    headers = {"Title": "Erkennung", "Priority": "urgent", "Tags": "rotating_light"}
+    headers = {"Title": "Erkennung", "Priority": _ntfy_priority(label), "Tags": "rotating_light"}
     click = payload.get("event_url")
     if click:
         headers["Click"] = click

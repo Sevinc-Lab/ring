@@ -136,6 +136,7 @@ in [`docs/INSTALL.md`](docs/INSTALL.md).
 | `DASHBOARD_BASE_URL` | .env | Dashboard-URL (Tailscale-HTTPS) für „Annehmen"-Links + Bilder |
 | `DETECT_CLASSES` | compose | Label-Priorität, z. B. `person,dog,cat,car` |
 | `NOTIFY_LABELS` | compose | Welche Labels Telegram benachrichtigen |
+| `NTFY_PRIORITY_<LABEL>` | compose | Eigene ntfy-Priorität pro Label (z. B. `NTFY_PRIORITY_PERSON=default`) → eigener Android-Kanal = eigener Klingelton |
 | `MIN_CONFIDENCE` | compose | Erkennungs-Schwelle (Standard 0.40) |
 | `RETENTION_ENABLED` / `RETENTION_DAYS` / `RETENTION_KEEP_LABELS` | .env | Auto-Aufräumen |
 
