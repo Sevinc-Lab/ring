@@ -105,8 +105,8 @@ def process_event(cfg: Config, conn, detector: Detector, event: dict) -> None:
             "event %s -> %s (max_conf=%.2f, frames=%d, cpu=%dms, wall=%dms)",
             event["id"], label, max_conf, len(frames), cpu_ms, wall_ms,
         )
-        if label in cfg.notify_labels:
-            maybe_notify(cfg, build_payload(cfg, event, label, max_conf, objects))
+        # maybe_notify decides per channel (ntfy alarm vs n8n/Telegram webhook).
+        maybe_notify(cfg, build_payload(cfg, event, label, max_conf, objects))
     except Exception as e:  # noqa: BLE001
         cpu_ms = round(1000 * (time.process_time() - t_cpu))
         meta = {"engine": ENGINE, "detected": False, "label": "error",
