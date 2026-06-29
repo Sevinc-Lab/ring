@@ -10,6 +10,7 @@ export interface WorkerDevice {
   hasLight?: boolean
   hasBattery?: boolean
   batteryLevel?: number | null
+  batteryLevels?: number[]
   hasLowBattery?: boolean
   operatingOnBattery?: boolean
 }

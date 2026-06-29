@@ -18,6 +18,11 @@ export function createRingApi(
   const api = new RingApi({
     refreshToken,
     controlCenterDisplayName,
+    // Refresh cached device status (incl. battery level) every 10 min. This is a
+    // Ring *cloud* status poll — it does NOT wake the camera or drain the
+    // battery. Without it, batteryLevel stays frozen at the value from container
+    // start, so the dashboard drifts away from the real charge over time.
+    cameraStatusPollingSeconds: 600,
   })
 
   api.onRefreshTokenUpdated.subscribe(async ({ newRefreshToken }) => {
