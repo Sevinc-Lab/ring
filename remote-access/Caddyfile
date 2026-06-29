@@ -1,0 +1,9 @@
+# HTTPS für das Dashboard mit echtem Let's-Encrypt-Zertifikat (DNS-01 via DuckDNS).
+# Erreichbar über die WireGuard-Tunnel-IP (10.8.0.1); das Zertifikat gilt für
+# deine DuckDNS-Domain, die der Tunnel-DNS auf 10.8.0.1 auflöst.
+{$DASHBOARD_DOMAIN} {
+	tls {
+		dns duckdns {$DUCKDNS_TOKEN}
+	}
+	reverse_proxy {$DASHBOARD_UPSTREAM}
+}
