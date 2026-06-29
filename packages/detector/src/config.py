@@ -52,4 +52,13 @@ class Config:
     dashboard_base_url: str = field(
         default_factory=lambda: os.environ.get("DASHBOARD_BASE_URL", "").rstrip("/")
     )
+    # ntfy: loud "alarm" push on detection (like the doorbell). Set NTFY_URL to a
+    # ntfy topic URL; NTFY_LABELS picks which labels alarm (e.g. person,cat).
+    # The detection thumbnail is attached as the image (it already exists here).
+    ntfy_url: str = field(default_factory=lambda: os.environ.get("NTFY_URL", ""))
+    ntfy_labels: list = field(
+        default_factory=lambda: [
+            c.strip() for c in os.environ.get("NTFY_LABELS", "").split(",") if c.strip()
+        ]
+    )
     log_level: str = field(default_factory=lambda: os.environ.get("LOG_LEVEL", "info"))

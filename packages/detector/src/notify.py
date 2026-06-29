@@ -8,9 +8,17 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import urllib.request
 
 log = logging.getLogger("detector.notify")
+
+LABEL_TEXT = {
+    "person": "Person",
+    "dog": "Hund",
+    "cat": "Katze",
+    "car": "Auto",
+}
 
 
 def build_payload(cfg, event: dict, label: str, max_conf: float, objects: list[dict]) -> dict:
@@ -34,20 +42,55 @@ def build_payload(cfg, event: dict, label: str, max_conf: float, objects: list[d
     return payload
 
 
+def _webhook_for(cfg, label: str) -> str:
+    """Per-label webhook override (N8N_WEBHOOK_URL_<LABEL>) or the default."""
+    specific = os.environ.get(f"N8N_WEBHOOK_URL_{label.upper()}", "").strip()
+    return specific or cfg.n8n_webhook_url
+
+
+def _notify_ntfy(cfg, payload: dict, label: str) -> None:
+    """Loud ntfy alarm with the detection image (header values stay ASCII; the
+    UTF-8 message goes in the body)."""
+    if not getattr(cfg, "ntfy_url", "") or label not in getattr(cfg, "ntfy_labels", []):
+        return
+    headers = {"Title": "Erkennung", "Priority": "urgent", "Tags": "rotating_light"}
+    click = payload.get("event_url")
+    if click:
+        headers["Click"] = click
+        headers["Actions"] = f"view, Ansehen, {click}"
+    if payload.get("thumb_url"):
+        headers["Attach"] = payload["thumb_url"]
+    name = LABEL_TEXT.get(label, label)
+    device = payload.get("device_name") or "Kamera"
+    body = f"🚨 {name} erkannt ({device})".encode("utf-8")
+    try:
+        req = urllib.request.Request(cfg.ntfy_url, data=body, headers=headers)
+        urllib.request.urlopen(req, timeout=10).close()
+        log.info("ntfy alarm for label=%s", label)
+    except Exception as e:  # noqa: BLE001
+        log.warning("ntfy alarm failed (ignored): %s", e)
+
+
 def maybe_notify(cfg, payload: dict) -> None:
-    # Only fire for relevant labels (never on 'none'/'error').
-    if payload.get("label") in (None, "none", "error", "unclassified"):
+    label = payload.get("label")
+    # Only fire for a real detection (never on 'none'/'error'/'unclassified').
+    if label in (None, "none", "error", "unclassified"):
         return
-    if not cfg.notify_enabled or not cfg.n8n_webhook_url:
-        log.debug("notify stub (disabled) for label=%s", payload.get("label"))
+
+    # 1) Loud ntfy alarm — independent of the n8n/Telegram path.
+    _notify_ntfy(cfg, payload, label)
+
+    # 2) n8n/Telegram webhook (per-label URL if configured).
+    if label not in cfg.notify_labels or not cfg.notify_enabled:
         return
-    # M4c: real send (guarded so a webhook failure never affects labeling).
+    url = _webhook_for(cfg, label)
+    if not url:
+        log.debug("notify stub (no webhook) for label=%s", label)
+        return
     try:
         data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            cfg.n8n_webhook_url, data=data, headers={"Content-Type": "application/json"}
-        )
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
         urllib.request.urlopen(req, timeout=10).close()
-        log.info("notified n8n for label=%s", payload.get("label"))
+        log.info("notified n8n for label=%s via %s", label, url)
     except Exception as e:  # noqa: BLE001
         log.warning("notify failed (ignored): %s", e)
