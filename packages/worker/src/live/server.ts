@@ -29,6 +29,42 @@ function readBinary(req: IncomingMessage, limit: number): Promise<Buffer> {
   })
 }
 
+/**
+ * Battery info for the dashboard. ring-client-api's `camera.batteryLevel`
+ * returns Math.min(battery_life, battery_life_2) — which is wrong for
+ * dual-battery cameras (e.g. cocoa_camera_v2): they drain ONE battery at a
+ * time, so the min is the near-empty spare while the device happily runs on the
+ * full one (the Ring app shows the full/active one). We report the ACTIVE
+ * (higher) battery as the headline, plus every present level for the tooltip.
+ */
+function batteryInfo(camera: RingCamera): {
+  hasBattery: boolean
+  batteryLevel: number | null
+  batteryLevels: number[]
+  hasLowBattery: boolean
+  operatingOnBattery: boolean
+} {
+  const d = camera.data as {
+    battery_life?: number | string | null
+    battery_life_2?: number | string | null
+  }
+  const parse = (v: number | string | null | undefined): number | null => {
+    if (v === null || v === undefined) return null
+    const n = typeof v === 'number' ? v : Number.parseFloat(v)
+    return Number.isNaN(n) ? null : n
+  }
+  const levels = [parse(d?.battery_life), parse(d?.battery_life_2)].filter(
+    (n): n is number => n !== null,
+  )
+  return {
+    hasBattery: camera.hasBattery,
+    batteryLevel: levels.length ? Math.max(...levels) : camera.batteryLevel,
+    batteryLevels: levels,
+    hasLowBattery: camera.hasLowBattery,
+    operatingOnBattery: camera.operatingOnBattery,
+  }
+}
+
 function readBody(req: IncomingMessage, limit = 200_000): Promise<string> {
   return new Promise((resolve, reject) => {
     let data = ''
@@ -98,10 +134,7 @@ export function startLiveServer(
             deviceType: c.deviceType,
             hasSiren: c.hasSiren,
             hasLight: c.hasLight,
-            hasBattery: c.hasBattery,
-            batteryLevel: c.batteryLevel,
-            hasLowBattery: c.hasLowBattery,
-            operatingOnBattery: c.operatingOnBattery,
+            ...batteryInfo(c),
           })),
         )
       }
@@ -166,11 +199,9 @@ export function startLiveServer(
           name: camera.name,
           hasSiren: camera.hasSiren,
           hasLight: camera.hasLight,
-          hasBattery: camera.hasBattery,
-          // Last known battery from cached device data — no wake / no drain.
-          batteryLevel: camera.batteryLevel,
-          hasLowBattery: camera.hasLowBattery,
-          operatingOnBattery: camera.operatingOnBattery,
+          // Battery from cached/polled device data — no wake / no drain. The
+          // headline is the ACTIVE (higher) of two batteries; see batteryInfo.
+          ...batteryInfo(camera),
         })
       }
 

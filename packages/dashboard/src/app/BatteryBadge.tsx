@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 interface Caps {
   hasBattery?: boolean
   batteryLevel?: number | null
+  batteryLevels?: number[]
   hasLowBattery?: boolean
   operatingOnBattery?: boolean
 }
@@ -40,9 +41,16 @@ export default function BatteryBadge({ deviceId }: { deviceId: string }) {
   const mid = !low && level <= 40
   const cls = low ? 'low' : mid ? 'mid' : 'ok'
   const icon = caps.operatingOnBattery === false ? '🔌' : low ? '🪫' : '🔋'
+  // Two batteries (e.g. cocoa_camera_v2): show both in the tooltip; the headline
+  // is the active (higher) one. The camera runs on one battery at a time.
+  const levels = caps.batteryLevels ?? []
+  const title =
+    levels.length > 1
+      ? `Akku: ${levels.map((l) => `${Math.round(l)}%`).join(' / ')} (aktiv: ${level}%)`
+      : `Akku: ${level}%`
 
   return (
-    <span className={`battery ${cls}`} title={`Akku: ${level}%`}>
+    <span className={`battery ${cls}`} title={title}>
       {icon} {level}%
     </span>
   )
